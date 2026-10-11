@@ -1,0 +1,70 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main, claude/fitness-app-dev-foj4jp]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION: 1.1.${{ github.run_number }}
+      VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Every APK must be signed with the same key, otherwise Android refuses
+      # to install it over the existing app (and the app's data would be lost).
+      - name: Install signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::Manjka secret ANDROID_KEYSTORE_BASE64 (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          mkdir -p ~/.android
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
+
+      - run: npm ci
+
+      - name: Build web bundle
+        run: npx esbuild www/js/app.js --bundle --format=esm --outfile=www/js/app.bundle.js --define:__APP_VERSION__=\"$APP_VERSION\"
+
+      - name: Create Android project
+        run: |
+          npx cap add android
+          sed -i -E "s/versionCode [0-9]+/versionCode $VERSION_CODE/; s/versionName \"[^\"]*\"/versionName \"$APP_VERSION\"/" android/app/build.gradle
+          npx cap sync android
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk gym-app.apk
+          gh release create "build-$VERSION_CODE" gym-app.apk \
+            --target "$GITHUB_SHA" \
+            --title "Gym aplikacija $APP_VERSION" \
+            --notes "$(git log -1 --pretty=%B)"
