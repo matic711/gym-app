@@ -205,4 +205,4 @@ class Store {
 }
 
 export const store = new Store();
-export { uid, isoDate, addDays, dowMon };
+export { uid, isoDate, addDays, dowMon, migrate };

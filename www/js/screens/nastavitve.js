@@ -1,10 +1,10 @@
-import { store } from '../state.js';
+import { store, migrate } from '../state.js';
+import { APP_VERSION, checkForUpdate, openDownload } from '../updates.js';
 import { isDark } from '../theme.js';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 
-const APP_VERSION = '1.0.0';
 
 function segButtons(options, current, onKey) {
   return options.map(label => {
@@ -200,7 +200,15 @@ ${switchRow('Samodejna kopija', 'Tedensko · v napravo ali oblak', t.autoBackup,
 <button type="button" data-action="deleteAll" style="width: 100%; min-height: 52px; border: 0; background: transparent; padding: 0 16px; font: inherit; font-size: 16px; font-weight: 600; color: var(--danger); cursor: pointer">Izbriši vse podatke</button>
 </section>
 
-<div style="padding: 16px 0 0; text-align: center; font-size: 12px; color: var(--text2)">Različica ${APP_VERSION}</div>
+<section style="margin-top: 16px; background: var(--card); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow)">
+<div style="padding: 14px 16px; display: flex; align-items: center; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0">
+<span style="font-size: 16px; font-weight: 600">Posodobitve</span>
+<span id="update-status" style="font-size: 12px; color: var(--text2)">Različica ${APP_VERSION}</span>
+</div>
+<button type="button" data-action="checkUpdate" style="height: 40px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--accentSoft); color: var(--accentText); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; flex-shrink: 0">Preveri</button>
+</div>
+</section>
 <input type="file" id="import-file-input" accept="application/json" style="display:none">
 </main>`;
 }
@@ -323,7 +331,7 @@ export function mount(root, ctx) {
         try {
           const parsed = JSON.parse(reader.result);
           if (!parsed || typeof parsed !== 'object' || !parsed.settings) throw new Error('invalid');
-          store.data = parsed;
+          store.data = migrate(parsed);
           store.save();
           alert('Podatki so bili uspešno uvoženi.');
         } catch (e) {
@@ -332,6 +340,28 @@ export function mount(root, ctx) {
       };
       reader.readAsText(file);
       fileInput.value = '';
+    });
+    root.querySelector('[data-action="checkUpdate"]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const status = root.querySelector('#update-status');
+      if (btn.dataset.ready) { openDownload(); return; }
+      btn.disabled = true;
+      status.textContent = 'Preverjam …';
+      try {
+        const upd = await checkForUpdate();
+        if (upd) {
+          status.textContent = `Na voljo je ${upd.version} (imaš ${APP_VERSION})`;
+          btn.textContent = 'Prenesi';
+          btn.dataset.ready = '1';
+          btn.style.background = 'var(--accent)';
+          btn.style.color = 'var(--onAccent)';
+        } else {
+          status.textContent = `Različica ${APP_VERSION} · imaš najnovejšo`;
+        }
+      } catch (err) {
+        status.textContent = 'Preverjanje ni uspelo — si povezan s spletom?';
+      }
+      btn.disabled = false;
     });
     root.querySelector('[data-action="deleteAll"]').addEventListener('click', () => {
       if (confirm('Izbrišem vse podatke aplikacije (treningi, predloge, počutje, nastavitve)? Tega dejanja ni mogoče razveljaviti.')) {

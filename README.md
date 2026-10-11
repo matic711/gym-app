@@ -29,7 +29,15 @@ npm install
 npm run serve      # zgradi bundle in zažene v brskalniku
 ```
 
-## Android
+## Namestitev na telefon (GitHub Actions)
+Ob vsakem pushu na `main` ali `claude/fitness-app-dev-foj4jp` GitHub Actions zgradi APK in ga objavi
+kot Release. Na telefonu odpri
+https://github.com/matic711/gym-app/releases/latest/download/gym-app.apk in namesti čez obstoječo aplikacijo
+(ali v aplikaciji: Nastavitve → Posodobitve → Preveri). Podatki ostanejo, ker je vsak APK podpisan
+z istim ključem iz secreta `ANDROID_KEYSTORE_BASE64` (base64 datoteke keystore, alias `androiddebugkey`,
+gesli `android`). Ključ hrani na varnem — brez njega posodobitev brez izgube podatkov ni mogoča.
+
+## Android (lokalno)
 ```
 npm install
 npx cap add android   # samo prvič
