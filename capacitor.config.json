@@ -1,0 +1,9 @@
+{
+	"appId": "com.gymapp.mobile",
+	"appName": "Gym aplikacija",
+	"webDir": "www",
+	"backgroundColor": "#F2F4F7",
+	"android": {
+		"backgroundColor": "#F2F4F7"
+	}
+}

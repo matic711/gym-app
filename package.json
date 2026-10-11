@@ -1,0 +1,22 @@
+{
+  "name": "gym-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gym aplikacija – sledenje treningom, predloge, zdravje in analitika (Capacitor)",
+  "scripts": {
+    "build": "esbuild www/js/app.js --bundle --format=esm --outfile=www/js/app.bundle.js",
+    "serve": "npm run build && npx http-server www -c-1",
+    "android": "npm run build && npx cap sync android && npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/filesystem": "^6.0.0",
+    "@capacitor/share": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "esbuild": "^0.23.0"
+  }
+}
