@@ -34,6 +34,11 @@ function toMin(t) { const [h, m] = String(t || '0:0').split(':').map(Number); re
 
 export function mount(root, ctx) {
   let selectedDate = new Date();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ctx.params.date || '')) {
+    const [y, m, d] = ctx.params.date.split('-').map(Number);
+    const picked = new Date(y, m - 1, d);
+    if (picked <= selectedDate) selectedDate = picked;
+  }
   let draft = null;
 
   function loadDraft() {

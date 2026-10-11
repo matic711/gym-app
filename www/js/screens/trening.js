@@ -48,7 +48,8 @@ function template(vm) {
 </div>`).join('');
 
   const historyHtml = vm.history.length ? vm.history.map(h => `
-<div style="display: flex; align-items: center; gap: 14px; padding: 14px 8px 14px 16px; color: var(--text); ${h.border}">
+<div style="display: flex; align-items: center; gap: 4px; padding: 0 8px 0 0; color: var(--text); ${h.border}">
+<a href="#/uredi?id=${encodeURIComponent(h.id)}" aria-label="Uredi trening ${h.name}" style="display: flex; align-items: center; gap: 14px; padding: 14px 4px 14px 16px; flex-grow: 1; min-width: 0; color: inherit; text-decoration: none">
 <div style="width: 44px; height: 44px; border-radius: 14px; background: var(--fill); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0">
 <div style="font-size: 10px; font-weight: 700; color: var(--text2); text-transform: uppercase">${h.dow}</div>
 <div style="font-size: 16px; font-weight: 700; line-height: 1">${h.day}</div>
@@ -58,6 +59,7 @@ function template(vm) {
 <div style="font-size: 13px; color: var(--text2)">${h.meta}</div>
 </div>
 <div style="font-size: 14px; font-weight: 600; color: var(--text2); flex-shrink: 0">${h.vol}</div>
+</a>
 <button type="button" data-action="deleteWorkout" data-id="${h.id}" aria-label="Izbriši trening ${h.name}" style="width: 36px; height: 36px; border: 0; border-radius: 18px; background: transparent; color: var(--text2); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0">
 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-9 0 1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M10 11v7M14 11v7"></path></svg>
 </button>

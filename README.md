@@ -9,7 +9,17 @@ Koda je bila obnovljena iz nameščenega APK-ja (`com.gymapp.mobile`).
 - **predloge** – predloge treningov (Push, Pull, Noge …)
 - **zdravje** – teža, spanec, počutje, energija
 - **analitika** – grafi in statistika
-- **nastavitve** – tema, velikost pisave, izvoz/uvoz podatkov (JSON)
+- **nastavitve** – tema, velikost pisave, opomniki, izvoz/uvoz podatkov (JSON)
+- **urediTrening** – urejanje že končanega treninga (klik na trening v zgodovini)
+- **vaja** – statistika posamezne vaje z grafi (1RM, teža, volumen, ponovitve)
+
+## Opomniki (`www/js/reminders.js`, `www/js/notifications.js`)
+- Domov prikaže kartico **Za vpisati**: manjkajoč dnevni vpis, manjkajoč včerajšnji vpis,
+  trening, ki še teče, in trening, ko zaostajaš za tedenskim ciljem.
+- Trening je „nujen“, ko je preostalih treningov do tedenskega cilja toliko kot preostalih dni
+  (ali več), sicer pa opomni, ko je od zadnjega treninga minilo preveč dni (cilj 4 → 3 dni).
+- Na telefonu se za 7 dni vnaprej načrtujejo obvestila (07:30 tehtanje, 18:00 trening,
+  21:00 dnevni vpis). Ob vsakem vpisu se načrt preračuna, zato že vpisani dnevi ne zvonijo.
 
 Podatki se hranijo lokalno (`localStorage`, ključ `gymapp:v1`), glej `www/js/state.js`.
 

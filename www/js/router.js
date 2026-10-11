@@ -6,6 +6,8 @@ import * as novTrening from './screens/novTrening.js';
 import * as zdravje from './screens/zdravje.js';
 import * as analitika from './screens/analitika.js';
 import * as nastavitve from './screens/nastavitve.js';
+import * as urediTrening from './screens/urediTrening.js';
+import * as vaja from './screens/vaja.js';
 
 const SCREENS = {
   home: { mod: domov, tab: 'home' },
@@ -14,7 +16,9 @@ const SCREENS = {
   nov: { mod: novTrening, tab: null },
   zdravje: { mod: zdravje, tab: 'zdravje' },
   analitika: { mod: analitika, tab: 'analitika' },
-  nastavitve: { mod: nastavitve, tab: 'nastavitve' }
+  nastavitve: { mod: nastavitve, tab: 'nastavitve' },
+  uredi: { mod: urediTrening, tab: null },
+  vaja: { mod: vaja, tab: 'analitika' }
 };
 
 let currentUnmount = null;
@@ -47,6 +51,7 @@ function render() {
   tabbarRoot.innerHTML = entry.tab ? renderTabBar(entry.tab) : '';
   screenRoot.classList.toggle('has-tabbar', !!entry.tab);
   screenRoot.innerHTML = '';
+  screenRoot.style.paddingBottom = '';
   screenRoot.scrollTop = 0;
   window.scrollTo(0, 0);
 

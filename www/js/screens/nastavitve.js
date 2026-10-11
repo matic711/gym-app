@@ -152,6 +152,7 @@ ${switchRow('Obseg pasu', 'Tedenski vpis · ' + (s.heightUnit === 'cm' ? 'cm' : 
 <section style="background: var(--card); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow)">
 ${switchRow('Vpis počutja', 'Vsak dan ob ' + (s.clock === '24 h' ? '21:00' : '9:00 PM'), t.remindMood, 'remindMood', true)}
 ${switchRow('Tehtanje', 'Vsak dan ob ' + (s.clock === '24 h' ? '07:30' : '7:30 AM'), t.remindWeigh, 'remindWeigh', false)}
+${switchRow('Trening', 'Ob ' + (s.clock === '24 h' ? '18:00' : '6:00 PM') + ', ko zaostajaš za tedenskim ciljem', t.remindTraining, 'remindTraining', false)}
 </section>
 
 <h2 style="margin: 18px 16px 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text2)">Podatki in varnostna kopija</h2>

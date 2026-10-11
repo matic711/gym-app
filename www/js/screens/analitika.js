@@ -1,5 +1,6 @@
 import { store } from '../state.js';
-import { isoDate, addDays, fromIso, fmtDateShort, workoutVolume, fmtNum, fmtNum1 } from '../util.js';
+import { isoDate, addDays, fromIso, fmtDateShort, workoutVolume, fmtNum, fmtNum1, escapeHtml } from '../util.js';
+import { allExercises } from '../stats.js';
 
 const RANGES = [
   { label: 'Teden', days: 7 },
@@ -152,24 +153,49 @@ function computeViewModel(rangeIdx) {
     moodAvg, energyAvg, moodBars,
     weeks: weeks_, trainingCountInRange, freq,
     prs,
+    exercises: allExercises(data).map(e => ({
+      name: e.name,
+      meta: `${e.count}× · zadnjič ${fmtDateShort(fromIso(e.lastISO))}`,
+      best: e.best1rm ? fmtNum1(e.best1rm) : '—'
+    })),
     fromLabel: fmtDateShort(start), toLabel: fmtDateShort(today), midLabel: fmtDateShort(addDays(start, Math.round(rangeDays / 2)))
   };
 }
 
-function template(vm, rangeIdx) {
+const EX_PREVIEW = 6;
+
+function exercisesHtml(vm, showAll) {
+  if (!vm.exercises.length) return `<div style="padding: 16px 0; color: var(--text2); font-size: 14px">Še ni zabeleženih vaj.</div>`;
+  const list = showAll ? vm.exercises : vm.exercises.slice(0, EX_PREVIEW);
+  return list.map((e, i) => `
+<a href="#/vaja?name=${encodeURIComponent(e.name)}" style="display: flex; align-items: center; gap: 12px; padding: 12px 0; text-decoration: none; color: var(--text); ${i ? 'border-top: 1px solid var(--line);' : ''}">
+<div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0">
+<span style="font-size: 15px; font-weight: 600">${escapeHtml(e.name)}</span>
+<span style="font-size: 12px; color: var(--text2)">${e.meta}</span>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0">
+<span style="font-size: 11px; color: var(--text2)">1RM</span>
+<span style="font-size: 15px; font-weight: 700">${e.best}</span>
+</div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--text2); flex-shrink: 0"><path d="M9 6l6 6-6 6"></path></svg>
+</a>`).join('') + (vm.exercises.length > EX_PREVIEW ? `
+<button type="button" data-action="toggleExercises" style="height: 44px; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--accentText); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">${showAll ? 'Pokaži manj' : `Pokaži vse (${vm.exercises.length})`}</button>` : '');
+}
+
+function template(vm, rangeIdx, showAllEx) {
   const rangesHtml = RANGES.map((r, i) => {
     const on = i === rangeIdx;
     return `<button type="button" role="tab" aria-selected="${on}" data-action="range" data-i="${i}" style="height: 34px; border: 0; border-radius: 9px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ${on ? 'background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08);' : 'background: transparent; color: var(--text2);'}">${r.label}</button>`;
   }).join('');
 
   const prsHtml = vm.prs.length ? vm.prs.map(r => `
-<div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; ${r.border}">
+<a href="#/vaja?name=${encodeURIComponent(r.name)}" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; text-decoration: none; color: var(--text); ${r.border}">
 <div style="display: flex; flex-direction: column; gap: 2px">
-<span style="font-size: 15px; font-weight: 600">${r.name}</span>
+<span style="font-size: 15px; font-weight: 600">${escapeHtml(r.name)}</span>
 <span style="font-size: 12px; color: var(--text2)">${r.date}</span>
 </div>
 <span style="font-size: 16px; font-weight: 700">${r.v}</span>
-</div>`).join('') : `<div style="padding: 16px 0; color: var(--text2); font-size: 14px">Še ni podatkov o rekordih.</div>`;
+</a>`).join('') : `<div style="padding: 16px 0; color: var(--text2); font-size: 14px">Še ni podatkov o rekordih.</div>`;
 
   const weeksHtml = vm.weeks.map(w => `
 <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; justify-content: flex-end; height: 130px">
@@ -274,13 +300,20 @@ cilj 8 h
 <h2 id="a-pr" style="margin: 0 0 6px; font-size: 15px; font-weight: 600">Osebni rekordi</h2>
 ${prsHtml}
 </section>
+
+<section aria-labelledby="a-vaje" style="background: var(--card); border-radius: 22px; padding: 18px 18px 6px; display: flex; flex-direction: column; box-shadow: var(--shadow)">
+<h2 id="a-vaje" style="margin: 0 0 2px; font-size: 15px; font-weight: 600">Statistika po vajah</h2>
+<div style="font-size: 13px; color: var(--text2); padding-bottom: 4px">Izberi vajo za grafe napredka</div>
+${exercisesHtml(vm, showAllEx)}
+</section>
 </main>`;
 }
 
 export function mount(root, ctx) {
-  let rangeIdx = 1;
+  let rangeIdx = 1, showAllEx = false;
   function render() {
-    root.innerHTML = template(computeViewModel(rangeIdx), rangeIdx);
+    root.innerHTML = template(computeViewModel(rangeIdx), rangeIdx, showAllEx);
+    root.querySelector('[data-action="toggleExercises"]')?.addEventListener('click', () => { showAllEx = !showAllEx; render(); });
     root.querySelectorAll('[data-action="range"]').forEach(btn => btn.addEventListener('click', () => {
       rangeIdx = Number(btn.getAttribute('data-i'));
       render();

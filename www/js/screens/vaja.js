@@ -1,0 +1,154 @@
+import { store } from '../state.js';
+import { fromIso, fmtDate, fmtDateShort, fmtNum, fmtNum1, escapeHtml } from '../util.js';
+import { exerciseHistory } from '../stats.js';
+import { lineChartHtml } from '../components/lineChart.js';
+
+const METRICS = [
+  { key: 'best1rm', label: '1RM', unit: 'kg', fmt: v => fmtNum1(v), color: 'var(--accent)', title: 'Ocenjen 1RM' },
+  { key: 'topKg', label: 'Teža', unit: 'kg', fmt: v => fmtNum1(v), color: 'var(--good)', title: 'Najtežja serija' },
+  { key: 'volume', label: 'Volumen', unit: 'kg', fmt: v => fmtNum(v), color: 'var(--sleep)', title: 'Volumen na trening' },
+  { key: 'totalReps', label: 'Pon.', unit: 'pon.', fmt: v => fmtNum(v), color: 'var(--mood)', title: 'Ponovitve na trening' }
+];
+
+const RANGES = [
+  { label: '3 mes.', days: 90 },
+  { label: 'Leto', days: 365 },
+  { label: 'Vse', days: null }
+];
+
+function fmtKg(kg) {
+  return Number.isInteger(kg) ? fmtNum(kg) : fmtNum1(kg);
+}
+
+function computeViewModel(name, metricIdx, rangeIdx) {
+  const all = exerciseHistory(store.data, name);
+  const days = RANGES[rangeIdx].days;
+  const cutoff = days ? new Date(Date.now() - days * 86400000) : null;
+  const hist = cutoff ? all.filter(h => fromIso(h.dateISO) >= cutoff) : all;
+  const metric = METRICS[metricIdx];
+
+  const points = hist.map(h => ({ v: h[metric.key], label: fmtDateShort(fromIso(h.dateISO)) }));
+  const first = hist[0], last = hist[hist.length - 1];
+  const delta = hist.length > 1 ? last[metric.key] - first[metric.key] : null;
+
+  let pr = null, best1rm = 0;
+  for (const h of all) {
+    if (!pr || h.topKg > pr.kg || (h.topKg === pr.kg && h.topReps > pr.reps)) pr = { kg: h.topKg, reps: h.topReps, dateISO: h.dateISO };
+    best1rm = Math.max(best1rm, h.best1rm);
+  }
+
+  const sessions = [...all].reverse().map((h, i) => ({
+    workoutId: h.workoutId,
+    date: fmtDate(fromIso(h.dateISO)),
+    workoutName: h.workoutName,
+    sets: h.sets.map(s => `${fmtKg(Number(s.kg) || 0)}×${s.reps}`).join(' · '),
+    best: fmtNum1(h.best1rm),
+    isPr: pr && h.dateISO === pr.dateISO && h.topKg === pr.kg,
+    border: i ? 'border-top: 1px solid var(--line);' : ''
+  }));
+
+  return {
+    name,
+    muscle: all.length ? all[all.length - 1].muscle : '',
+    count: all.length,
+    lastLabel: all.length ? fmtDate(fromIso(all[all.length - 1].dateISO)) : '—',
+    prLabel: pr ? `${fmtKg(pr.kg)} kg × ${pr.reps}` : '—',
+    best1rm: best1rm ? fmtNum1(best1rm) : '—',
+    metric, points,
+    current: last ? metric.fmt(last[metric.key]) : '—',
+    delta: delta == null ? null : { text: `${delta >= 0 ? '+' : '−'}${metric.fmt(Math.abs(delta))} ${metric.unit}`, good: delta >= 0 },
+    sessions
+  };
+}
+
+function segHtml(items, current, action) {
+  return items.map((it, i) => {
+    const on = i === current;
+    return `<button type="button" role="tab" aria-selected="${on}" data-action="${action}" data-i="${i}" style="height: 34px; border: 0; border-radius: 9px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; ${on ? 'background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08);' : 'background: transparent; color: var(--text2);'}">${it.label}</button>`;
+  }).join('');
+}
+
+function tile(label, value) {
+  return `<div style="background: var(--card); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; box-shadow: var(--shadow)">
+<div style="font-size: 12px; color: var(--text2)">${label}</div>
+<div style="font-size: 17px; font-weight: 700">${value}</div>
+</div>`;
+}
+
+function template(vm, metricIdx, rangeIdx) {
+  const sessionsHtml = vm.sessions.length ? vm.sessions.map(s => `
+<a href="#/uredi?id=${encodeURIComponent(s.workoutId)}" style="display: flex; align-items: center; gap: 12px; padding: 12px 0; text-decoration: none; color: var(--text); ${s.border}">
+<div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="font-size: 15px; font-weight: 600">${s.date}</span>
+${s.isPr ? '<span style="padding: 2px 8px; border-radius: 999px; background: var(--accentSoft); color: var(--accentText); font-size: 11px; font-weight: 700">REKORD</span>' : ''}
+</div>
+<div style="font-size: 13px; color: var(--text2)">${escapeHtml(s.workoutName)}</div>
+<div style="font-size: 13px; color: var(--text); overflow-wrap: anywhere">${s.sets}</div>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0">
+<span style="font-size: 11px; color: var(--text2)">1RM</span>
+<span style="font-size: 15px; font-weight: 700">${s.best}</span>
+</div>
+</a>`).join('') : `<div style="padding: 16px 0; color: var(--text2); font-size: 14px">Ta vaja še ni bila zabeležena.</div>`;
+
+  return `
+<header style="padding: 16px 12px 0 8px">
+<a href="#" data-action="back" style="height: 44px; padding: 0 8px; display: inline-flex; align-items: center; gap: 2px; color: var(--accentText); text-decoration: none; font-size: 16px; font-weight: 500">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+Nazaj
+</a>
+</header>
+
+<main style="padding: 4px 20px 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 30px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em">${escapeHtml(vm.name)}</h1>
+${vm.muscle ? `<div style="font-size: 14px; color: var(--text2)">${escapeHtml(vm.muscle)}</div>` : ''}
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+${tile('Rekord', vm.prLabel)}
+${tile('Najboljši 1RM', vm.best1rm + (vm.best1rm !== '—' ? ' <span style="font-size: 12px; font-weight: 500; color: var(--text2)">kg</span>' : ''))}
+${tile('Treningov', vm.count)}
+${tile('Zadnjič', vm.lastLabel)}
+</div>
+
+<section style="background: var(--card); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow)">
+<div role="tablist" aria-label="Meritev" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; background: var(--fill); border-radius: 12px">
+${segHtml(METRICS, metricIdx, 'metric')}
+</div>
+<div style="display: flex; align-items: flex-start; justify-content: space-between">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600; color: ${vm.metric.color}">${vm.metric.title}</h2>
+<div style="font-size: 28px; font-weight: 700; letter-spacing: -0.02em">${vm.current} <span style="font-size: 15px; font-weight: 500; color: var(--text2)">${vm.metric.unit}</span></div>
+</div>
+${vm.delta ? `<div style="padding: 5px 10px; border-radius: 999px; background: var(--fill); font-size: 13px; font-weight: 600; color: ${vm.delta.good ? 'var(--good)' : 'var(--danger)'}">${vm.delta.text}</div>` : ''}
+</div>
+${lineChartHtml(vm.points, { color: vm.metric.color, fmt: vm.metric.fmt })}
+<div role="tablist" aria-label="Obdobje" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; background: var(--fill); border-radius: 12px">
+${segHtml(RANGES, rangeIdx, 'range')}
+</div>
+</section>
+
+<section style="background: var(--card); border-radius: 22px; padding: 10px 18px 6px; display: flex; flex-direction: column; box-shadow: var(--shadow)">
+<h2 style="margin: 6px 0 2px; font-size: 15px; font-weight: 600">Zgodovina</h2>
+${sessionsHtml}
+</section>
+</main>`;
+}
+
+export function mount(root, ctx) {
+  const name = ctx.params.name || '';
+  let metricIdx = 0, rangeIdx = 2;
+  function render() {
+    root.innerHTML = template(computeViewModel(name, metricIdx, rangeIdx), metricIdx, rangeIdx);
+    root.querySelector('[data-action="back"]').addEventListener('click', (e) => {
+      e.preventDefault();
+      if (history.length > 1) history.back(); else ctx.navigate('analitika');
+    });
+    root.querySelectorAll('[data-action="metric"]').forEach(b => b.addEventListener('click', () => { metricIdx = Number(b.dataset.i); render(); }));
+    root.querySelectorAll('[data-action="range"]').forEach(b => b.addEventListener('click', () => { rangeIdx = Number(b.dataset.i); render(); }));
+  }
+  render();
+  return store.subscribe(render);
+}

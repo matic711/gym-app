@@ -146,7 +146,7 @@ function defaultSettings() {
     toggles: {
       sound: true, vibe: true, prevValues: true,
       trackWeight: true, trackSleep: true, trackMood: true, trackEnergy: true, trackStress: true, trackWaist: false,
-      remindMood: true, remindWeigh: false,
+      remindMood: true, remindWeigh: false, remindTraining: true,
       autoBackup: true
     },
     lastBackupAt: null
@@ -165,6 +165,13 @@ function emptyData() {
   };
 }
 
+// Fill in settings added in newer versions so older saved data keeps working.
+function migrate(data) {
+  const def = defaultSettings();
+  data.settings = { ...def, ...data.settings, toggles: { ...def.toggles, ...(data.settings && data.settings.toggles) } };
+  return data;
+}
+
 class Store {
   constructor() {
     this.data = this.load();
@@ -173,7 +180,7 @@ class Store {
   load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) return migrate(JSON.parse(raw));
     } catch (e) { /* corrupt storage, fall through to reseed */ }
     const seeded = seedData();
     this.persist(seeded);
