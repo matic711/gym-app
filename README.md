@@ -34,4 +34,9 @@ npm run serve      # zgradi bundle in zažene v brskalniku
 npm install
 npx cap add android   # samo prvič
 npm run android       # build + sync + odpre Android Studio
+npm run phone         # build + namesti na priklopljen telefon (adb install -r, podatki ostanejo)
 ```
+
+`adb install -r` ohrani podatke le, če je APK podpisan z istim ključem kot nameščena
+aplikacija (debug ključ v `~/.android/debug.keystore` na računalniku, kjer se gradi).
+Če se ključa ne ujemata, namestitev javi `INSTALL_FAILED_UPDATE_INCOMPATIBLE` in ničesar ne spremeni.

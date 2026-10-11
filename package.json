@@ -6,7 +6,8 @@
   "scripts": {
     "build": "esbuild www/js/app.js --bundle --format=esm --outfile=www/js/app.bundle.js",
     "serve": "npm run build && npx http-server www -c-1",
-    "android": "npm run build && npx cap sync android && npx cap open android"
+    "android": "npm run build && npx cap sync android && npx cap open android",
+    "phone": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug && adb install -r app/build/outputs/apk/debug/app-debug.apk"
   },
   "dependencies": {
     "@capacitor/android": "^6.0.0",
