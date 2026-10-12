@@ -4,8 +4,7 @@ import { exerciseHistory } from '../stats.js';
 import { lineChartHtml } from '../components/lineChart.js';
 
 const METRICS = [
-  { key: 'best1rm', label: '1RM', unit: 'kg', fmt: v => fmtNum1(v), color: 'var(--accent)', title: 'Ocenjen 1RM' },
-  { key: 'topKg', label: 'Teža', unit: 'kg', fmt: v => fmtNum1(v), color: 'var(--good)', title: 'Najtežja serija' },
+  { key: 'topKg', label: 'Teža', unit: 'kg', fmt: v => fmtNum1(v), color: 'var(--accent)', title: 'Najtežji dvig' },
   { key: 'volume', label: 'Volumen', unit: 'kg', fmt: v => fmtNum(v), color: 'var(--sleep)', title: 'Volumen na trening' },
   { key: 'totalReps', label: 'Pon.', unit: 'pon.', fmt: v => fmtNum(v), color: 'var(--mood)', title: 'Ponovitve na trening' }
 ];
@@ -31,18 +30,18 @@ function computeViewModel(name, metricIdx, rangeIdx) {
   const first = hist[0], last = hist[hist.length - 1];
   const delta = hist.length > 1 ? last[metric.key] - first[metric.key] : null;
 
-  let pr = null, best1rm = 0;
+  let pr = null;
   for (const h of all) {
     if (!pr || h.topKg > pr.kg || (h.topKg === pr.kg && h.topReps > pr.reps)) pr = { kg: h.topKg, reps: h.topReps, dateISO: h.dateISO };
-    best1rm = Math.max(best1rm, h.best1rm);
   }
+  const gain = all.length > 1 ? all[all.length - 1].topKg - all[0].topKg : null;
 
   const sessions = [...all].reverse().map((h, i) => ({
     workoutId: h.workoutId,
     date: fmtDate(fromIso(h.dateISO)),
     workoutName: h.workoutName,
     sets: h.sets.map(s => `${fmtKg(Number(s.kg) || 0)}×${s.reps}`).join(' · '),
-    best: fmtNum1(h.best1rm),
+    top: `${fmtKg(h.topKg)} × ${h.topReps}`,
     isPr: pr && h.dateISO === pr.dateISO && h.topKg === pr.kg,
     border: i ? 'border-top: 1px solid var(--line);' : ''
   }));
@@ -53,7 +52,7 @@ function computeViewModel(name, metricIdx, rangeIdx) {
     count: all.length,
     lastLabel: all.length ? fmtDate(fromIso(all[all.length - 1].dateISO)) : '—',
     prLabel: pr ? `${fmtKg(pr.kg)} kg × ${pr.reps}` : '—',
-    best1rm: best1rm ? fmtNum1(best1rm) : '—',
+    gain: gain == null ? '—' : `${gain >= 0 ? '+' : '−'}${fmtKg(Math.abs(gain))} kg`,
     metric, points,
     current: last ? metric.fmt(last[metric.key]) : '—',
     delta: delta == null ? null : { text: `${delta >= 0 ? '+' : '−'}${metric.fmt(Math.abs(delta))} ${metric.unit}`, good: delta >= 0 },
@@ -87,8 +86,8 @@ ${s.isPr ? '<span style="padding: 2px 8px; border-radius: 999px; background: var
 <div style="font-size: 13px; color: var(--text); overflow-wrap: anywhere">${s.sets}</div>
 </div>
 <div style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0">
-<span style="font-size: 11px; color: var(--text2)">1RM</span>
-<span style="font-size: 15px; font-weight: 700">${s.best}</span>
+<span style="font-size: 11px; color: var(--text2)">Najtežje</span>
+<span style="font-size: 15px; font-weight: 700">${s.top}</span>
 </div>
 </a>`).join('') : `<div style="padding: 16px 0; color: var(--text2); font-size: 14px">Ta vaja še ni bila zabeležena.</div>`;
 
@@ -108,13 +107,13 @@ ${vm.muscle ? `<div style="font-size: 14px; color: var(--text2)">${escapeHtml(vm
 
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
 ${tile('Rekord', vm.prLabel)}
-${tile('Najboljši 1RM', vm.best1rm + (vm.best1rm !== '—' ? ' <span style="font-size: 12px; font-weight: 500; color: var(--text2)">kg</span>' : ''))}
+${tile('Od začetka', vm.gain)}
 ${tile('Treningov', vm.count)}
 ${tile('Zadnjič', vm.lastLabel)}
 </div>
 
 <section style="background: var(--card); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow)">
-<div role="tablist" aria-label="Meritev" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; background: var(--fill); border-radius: 12px">
+<div role="tablist" aria-label="Meritev" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; background: var(--fill); border-radius: 12px">
 ${segHtml(METRICS, metricIdx, 'metric')}
 </div>
 <div style="display: flex; align-items: flex-start; justify-content: space-between">

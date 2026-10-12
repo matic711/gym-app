@@ -1,5 +1,6 @@
 import { store } from '../state.js';
 import { computeReminders, logStreak } from '../reminders.js';
+import { formReport } from '../analysis.js';
 import { isoDate, addDays, startOfWeek, fromIso, fmtWeekday, fmtDate, fmtNum, fmtNum1, workoutVolume, workoutSetCount } from '../util.js';
 
 const MOOD_LABELS = ['Slabo', 'Meh', 'V redu', 'Dobro', 'Odlično'];
@@ -103,6 +104,12 @@ function computeViewModel() {
     volume: fmtNum(weekVolume),
     volumeMeta: `Ta teden · ${done} ${treningWord(done)}`,
     reminders: computeReminders(data, today),
+    formWarning: (() => {
+      const rep = formReport(data, today);
+      if (!rep.slacking) return null;
+      const items = rep.items.filter(i => i.level === 'bad' || i.level === 'warn');
+      return { title: items[0].title, text: items[0].text, more: items.length - 1 };
+    })(),
     streak: logStreak(data, today),
     lastWorkout: lastWorkout ? {
       id: lastWorkout.id,
@@ -175,6 +182,16 @@ ${streakHtml}
 </header>
 
 ${remindersHtml}
+
+${vm.formWarning ? `
+<a href="#/forma" style="background: var(--card); border-radius: 22px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; text-decoration: none; color: var(--text); box-shadow: var(--shadow); border-left: 4px solid var(--danger)">
+<div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--danger)">Opozorilo · forma</div>
+<div style="font-size: 15px; font-weight: 600">${vm.formWarning.title}</div>
+<div style="font-size: 13px; color: var(--text2)">${vm.formWarning.text}${vm.formWarning.more ? ` (+${vm.formWarning.more} več)` : ''}</div>
+</div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--text2); flex-shrink: 0; margin-top: 2px"><path d="M9 6l6 6-6 6"></path></svg>
+</a>` : ''}
 
 <section style="background: var(--card); border-radius: 22px; padding: 18px; display: flex; align-items: center; gap: 18px; box-shadow: var(--shadow)">
 <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true">

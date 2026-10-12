@@ -4,7 +4,7 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { isoDate, addDays } from './util.js';
-import { trainingNeed, REMIND_TIMES } from './reminders.js';
+import { trainingNeed, REMIND_TIMES, morningTime } from './reminders.js';
 
 const ID_BASE = 1000;
 const ID_SPAN = 100;
@@ -14,6 +14,18 @@ function at(date, { h, m }) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, m, 0, 0);
 }
 
+// Minutes after the morning time at which the check-in reminder repeats,
+// as long as the day is still not logged.
+const MORNING_REPEATS = [0, 60, 120, 180, 300, 540];
+const MORNING_TEXTS = [
+  ['Dobro jutro ☀️', 'Jutranji vpis: teža, spanec, stres — 20 sekund.'],
+  ['Jutranji vpis čaka', 'Stehtaj se in vpiši, kako si spal.'],
+  ['Še vedno brez vpisa', 'Brez vpisov analiza ne ve, kaj vpliva na tvoje lifte.'],
+  ['Jutranji vpis', 'Danes še nisi vpisal teže in spanca.'],
+  ['Niz vpisov je v nevarnosti', 'Vpiši današnji dan, da ne prekineš niza.'],
+  ['Še vedno nič?', 'Vpis traja 20 sekund. Daj, odpri aplikacijo.']
+];
+
 export function planNotifications(data, now = new Date()) {
   const t = data.settings.toggles || {};
   const out = [];
@@ -22,15 +34,20 @@ export function planNotifications(data, now = new Date()) {
     const iso = isoDate(day);
     const logged = !!data.wellness[iso];
 
-    if (t.remindWeigh && t.trackWeight && !logged) {
-      out.push({ id: ID_BASE + d * 3, title: 'Tehtanje', body: 'Stehtaj se in vpiši težo.', at: at(day, REMIND_TIMES.weigh) });
+    if (t.remindMorning !== false && !logged) {
+      const start = at(day, morningTime(data.settings));
+      MORNING_REPEATS.forEach((mins, k) => {
+        const [title, body] = MORNING_TEXTS[k];
+        out.push({ id: ID_BASE + d * 10 + k, title, body, at: new Date(start.getTime() + mins * 60000) });
+      });
+      const evening = at(day, REMIND_TIMES.evening);
+      if (evening > new Date(start.getTime() + MORNING_REPEATS[MORNING_REPEATS.length - 1] * 60000)) {
+        out.push({ id: ID_BASE + d * 10 + 6, title: 'Zadnji klic za danes', body: 'Današnji dan še ni vpisan.', at: evening });
+      }
     }
     if (t.remindTraining !== false && !(d === 0 && data.activeWorkout)) {
       const need = trainingNeed(data, day);
-      if (need) out.push({ id: ID_BASE + d * 3 + 1, title: need.urgent ? 'Danes je dan za trening 💪' : 'Čas je za trening', body: need.reason + '.', at: at(day, REMIND_TIMES.training) });
-    }
-    if (t.remindMood && !logged) {
-      out.push({ id: ID_BASE + d * 3 + 2, title: 'Vpiši današnji dan', body: 'Spanec, počutje in energija — traja 20 sekund.', at: at(day, REMIND_TIMES.mood) });
+      if (need) out.push({ id: ID_BASE + d * 10 + 8, title: need.urgent ? 'Danes je dan za trening 💪' : 'Čas je za trening', body: need.reason + '.', at: at(day, REMIND_TIMES.training) });
     }
   }
   return out.filter(n => n.at > now);

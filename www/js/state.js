@@ -142,11 +142,13 @@ function defaultSettings() {
     heightCm: 182,
     goalWeightKg: 76.0,
     defaultRestSec: 90,
+    morningTime: '07:30',
     firstDayMonday: true,
     toggles: {
       sound: true, vibe: true, prevValues: true,
       trackWeight: true, trackSleep: true, trackMood: true, trackEnergy: true, trackStress: true, trackWaist: false,
       remindMood: true, remindWeigh: false, remindTraining: true,
+      remindMorning: true, morningGate: true,
       autoBackup: true
     },
     lastBackupAt: null

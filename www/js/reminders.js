@@ -5,10 +5,22 @@ import { isoDate, addDays, fromIso, startOfWeek, dowMon } from './util.js';
 const DAY_MS = 86400000;
 
 export const REMIND_TIMES = {
-  weigh: { h: 7, m: 30 },
   training: { h: 18, m: 0 },
-  mood: { h: 21, m: 0 }
+  evening: { h: 21, m: 0 }
 };
+
+export function morningTime(settings) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(settings.morningTime || '');
+  return m ? { h: Math.min(23, Number(m[1])), m: Math.min(59, Number(m[2])) } : { h: 7, m: 30 };
+}
+
+// The app stays locked on the morning check-in until today's entry exists.
+export function needsMorningCheckin(data, now = new Date()) {
+  const t = data.settings.toggles || {};
+  if (t.morningGate === false || !tracksWellness(t)) return false;
+  if (now.getHours() < 4) return false; // still "last night"
+  return !data.wellness[isoDate(now)];
+}
 
 function daysBetween(fromIsoStr, toDate) {
   return Math.round((new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate()) - fromIso(fromIsoStr)) / DAY_MS);
@@ -90,9 +102,10 @@ export function computeReminders(data, now = new Date()) {
   if (tracksWellness(t)) {
     if (!data.wellness[todayIso]) {
       const parts = [t.trackWeight && 'teža', t.trackSleep && 'spanec', t.trackMood && 'počutje', t.trackEnergy && 'energija'].filter(Boolean);
+      const mt = morningTime(data.settings);
       out.push({
-        key: 'wellness', urgent: hour >= REMIND_TIMES.mood.h,
-        title: 'Vpiši današnji dan', sub: parts.join(', ').replace(/^./, c => c.toUpperCase()),
+        key: 'wellness', urgent: hour >= mt.h + mt.m / 60 + 2,
+        title: 'Jutranji vpis', sub: parts.join(', ').replace(/^./, c => c.toUpperCase()),
         cta: 'Vpiši', route: 'zdravje'
       });
     }

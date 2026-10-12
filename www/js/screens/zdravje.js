@@ -33,6 +33,9 @@ function relLabel(date, today) {
 function toMin(t) { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + m; }
 
 export function mount(root, ctx) {
+  // Morning check-in: the router shows this screen instead of any other until
+  // today is logged. Nothing is saved until the user confirms.
+  const gate = ctx.params.jutro === '1';
   let selectedDate = new Date();
   if (/^\d{4}-\d{2}-\d{2}$/.test(ctx.params.date || '')) {
     const [y, m, d] = ctx.params.date.split('-').map(Number);
@@ -48,7 +51,8 @@ export function mount(root, ctx) {
     draft = saved ? { ...saved } : defaultsFor(data, iso);
   }
 
-  function persist() {
+  function persist(force) {
+    if (gate && !force) return;
     const iso = isoDate(selectedDate);
     store.data.wellness[iso] = { ...draft };
     store.save();
@@ -86,8 +90,14 @@ export function mount(root, ctx) {
     root.innerHTML = `
 <main style="padding: 28px 20px 0; display: flex; flex-direction: column; gap: 16px">
 <header style="display: flex; flex-direction: column; gap: 12px">
-<h1 style="margin: 0; font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em">Počutje</h1>
-<div style="display: flex; align-items: center; justify-content: space-between; background: var(--card); border-radius: 14px; padding: 0 4px; box-shadow: var(--shadow)">
+${gate ? `
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text2)">${relLabel(selectedDate, today)}</div>
+<h1 style="margin: 0; font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em">Dobro jutro</h1>
+<div style="font-size: 15px; color: var(--text2)">Najprej jutranji vpis, potem aplikacija. Traja 20 sekund.</div>
+</div>` : `
+<h1 style="margin: 0; font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em">Počutje</h1>`}
+<div style="display: ${gate ? 'none' : 'flex'}; align-items: center; justify-content: space-between; background: var(--card); border-radius: 14px; padding: 0 4px; box-shadow: var(--shadow)">
 <button type="button" aria-label="Prejšnji dan" data-action="prevDay" style="width: 44px; height: 44px; border: 0; background: transparent; color: var(--accentText); display: flex; align-items: center; justify-content: center; cursor: pointer">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
 </button>
@@ -109,7 +119,7 @@ Teža
 <div style="display: flex; align-items: center; justify-content: space-between">
 <button type="button" aria-label="Zmanjšaj težo" data-action="wDown" style="width: 48px; height: 48px; border: 0; border-radius: 24px; background: var(--fill); color: var(--text); font-size: 24px; font-weight: 500; cursor: pointer">−</button>
 <div style="display: flex; align-items: baseline; gap: 6px">
-<span style="font-size: 44px; font-weight: 700; letter-spacing: -0.03em">${draft.weight.toFixed(1).replace('.', ',')}</span>
+<button type="button" data-action="wEdit" aria-label="Vpiši težo" style="border: 0; background: transparent; padding: 0; font: inherit; font-size: 44px; font-weight: 700; letter-spacing: -0.03em; color: var(--text); cursor: pointer">${draft.weight.toFixed(1).replace('.', ',')}</button>
 <span style="font-size: 18px; font-weight: 500; color: var(--text2)">kg</span>
 </div>
 <button type="button" aria-label="Povečaj težo" data-action="wUp" style="width: 48px; height: 48px; border: 0; border-radius: 24px; background: var(--fill); color: var(--text); font-size: 24px; font-weight: 500; cursor: pointer">+</button>
@@ -175,7 +185,7 @@ Kako se počutiš?
 </label>
 </section>
 
-<button type="button" data-action="save" style="height: 54px; border: 0; border-radius: 16px; background: var(--accent); color: var(--onAccent); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer">Shrani vnos</button>
+<button type="button" data-action="save" style="height: 54px; border: 0; border-radius: 16px; background: var(--accent); color: var(--onAccent); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer">${gate ? 'Shrani in nadaljuj' : 'Shrani vnos'}</button>
 </main>`;
 
     wire();
@@ -194,6 +204,11 @@ Kako se počutiš?
       render();
     });
     root.querySelector('[data-action="wDown"]').addEventListener('click', () => { draft.weight = Math.round((draft.weight - 0.1) * 10) / 10; persist(); render(); });
+    root.querySelector('[data-action="wEdit"]').addEventListener('click', () => {
+      const val = prompt('Teža (kg):', draft.weight.toFixed(1).replace('.', ','));
+      const num = parseFloat(String(val || '').replace(',', '.'));
+      if (val != null && num > 20 && num < 400) { draft.weight = Math.round(num * 10) / 10; persist(); render(); }
+    });
     root.querySelector('[data-action="wUp"]').addEventListener('click', () => { draft.weight = Math.round((draft.weight + 0.1) * 10) / 10; persist(); render(); });
     root.querySelector('[data-action="bed"]').addEventListener('change', (e) => { draft.bed = e.target.value; persist(); render(); });
     root.querySelector('[data-action="wake"]').addEventListener('change', (e) => { draft.wake = e.target.value; persist(); render(); });
@@ -203,8 +218,8 @@ Kako se počutiš?
     root.querySelector('[data-action="stress"]').addEventListener('change', (e) => { draft.stress = Number(e.target.value); persist(); render(); });
     root.querySelector('[data-action="note"]').addEventListener('change', (e) => { draft.note = e.target.value; persist(); });
     root.querySelector('[data-action="save"]').addEventListener('click', () => {
-      persist();
-      ctx.navigate('home');
+      persist(true);
+      if (gate) ctx.refresh(); else ctx.navigate('home');
     });
   }
 

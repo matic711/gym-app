@@ -1,4 +1,6 @@
 import { renderTabBar } from './components/tabbar.js';
+import { store } from './state.js';
+import { needsMorningCheckin } from './reminders.js';
 import * as domov from './screens/domov.js';
 import * as trening from './screens/trening.js';
 import * as predloge from './screens/predloge.js';
@@ -8,6 +10,7 @@ import * as analitika from './screens/analitika.js';
 import * as nastavitve from './screens/nastavitve.js';
 import * as urediTrening from './screens/urediTrening.js';
 import * as vaja from './screens/vaja.js';
+import * as forma from './screens/forma.js';
 
 const SCREENS = {
   home: { mod: domov, tab: 'home' },
@@ -18,7 +21,8 @@ const SCREENS = {
   analitika: { mod: analitika, tab: 'analitika' },
   nastavitve: { mod: nastavitve, tab: 'nastavitve' },
   uredi: { mod: urediTrening, tab: null },
-  vaja: { mod: vaja, tab: 'analitika' }
+  vaja: { mod: vaja, tab: 'analitika' },
+  forma: { mod: forma, tab: 'analitika' }
 };
 
 let currentUnmount = null;
@@ -37,8 +41,13 @@ function parseHash() {
 }
 
 function render() {
-  const { route, params } = parseHash();
-  const entry = SCREENS[route] || SCREENS.home;
+  let { route, params } = parseHash();
+  let entry = SCREENS[route] || SCREENS.home;
+  // Morning check-in comes first; only a workout already in progress may skip it.
+  if (needsMorningCheckin(store.data) && !(route === 'nov' && store.data.activeWorkout)) {
+    params = { jutro: '1' };
+    entry = { mod: zdravje, tab: null };
+  }
 
   const screenRoot = document.getElementById('screen-root');
   const tabbarRoot = document.getElementById('tabbar-root');
@@ -55,7 +64,7 @@ function render() {
   screenRoot.scrollTop = 0;
   window.scrollTo(0, 0);
 
-  const ctx = { navigate, params };
+  const ctx = { navigate, params, refresh: render };
   const result = entry.mod.mount(screenRoot, ctx);
   if (typeof result === 'function') currentUnmount = result;
 
@@ -67,6 +76,9 @@ function render() {
     });
   });
 }
+
+// Re-check the morning lock, e.g. when the app comes back after midnight.
+export function refresh() { render(); }
 
 export function startRouter() {
   window.addEventListener('hashchange', render);
