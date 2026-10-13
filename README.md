@@ -18,6 +18,17 @@ Koda je bila obnovljena iz nameščenega APK-ja (`com.gymapp.mobile`).
 Imena vaj so v angleščini (knjižnica v `exercises.js`). Starejši podatki s slovenskimi imeni se ob
 prvem zagonu enkrat preimenujejo (`SL_TO_EN`), iskanje vaj pa razume tudi slovenske besede.
 
+## Predlogi teže – double progression (`www/js/progression.js`)
+Za vsako vajo pogleda zadnji trening te vaje (delovne serije = serije z najvišjo težo):
+- vse serije na vrhu razpona → +korak teže, cilj spodnja meja ponovitev,
+- sicer ista teža in +1 ponovitev (pod spodnjo mejo: cilj spodnja meja),
+- dvakrat zapored pod razponom pri isti teži → −10 % (deload),
+- slab jutranji vpis (spanec < 6 h, kakovost 1/5 ali stres ≥ 8) → namesto dviga „drži težo“.
+
+Privzeto: compound 6–8 pon. (noge +5 kg, ostalo +2,5 kg), izolacija in kabli 10–15 pon. +2,5 kg,
+lastna teža 6–12 pon. nato +2,5 kg uteži; core/kardio brez predlogov. Za vsako vajo se nastavi
+na zaslonu vaje (Napredovanje). Med treningom ✓ na prazni seriji prevzame predlagane vrednosti.
+
 ## Jutranji vpis
 Dokler današnji dan ni vpisan (od 4:00 naprej), aplikacija pokaže samo zaslon „Dobro jutro“
 (izklopiš v Nastavitve → Opomniki → Zakleni aplikacijo do vpisa). Obvestilo pride ob nastavljeni uri

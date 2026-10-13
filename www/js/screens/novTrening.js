@@ -1,6 +1,12 @@
 import { store, uid, isoDate } from '../state.js';
 import { fmtNum } from '../util.js';
 import { openExercisePicker } from '../components/exercisePicker.js';
+import { recommend } from '../progression.js';
+
+const REC_COLORS = { up: 'var(--good)', reps: 'var(--accentText)', hold: 'var(--mood)', deload: 'var(--danger)' };
+const REC_ICONS = { up: '↑', reps: '+1', hold: '=', deload: '↓' };
+
+function fmtKgInput(kg) { return String(Math.round(kg * 100) / 100).replace('.', ','); }
 
 function findPrevSet(data, exerciseName, setIndex) {
   const sorted = [...data.workouts].sort((a, b) => b.dateISO.localeCompare(a.dateISO));
@@ -8,7 +14,7 @@ function findPrevSet(data, exerciseName, setIndex) {
     const ex = w.exercises.find(e => e.name.toLowerCase() === exerciseName.toLowerCase());
     if (ex && ex.sets[setIndex]) {
       const s = ex.sets[setIndex];
-      return `${fmtNum(s.kg)} × ${s.reps}`;
+      return `${fmtKgInput(Number(s.kg) || 0)} × ${s.reps}`;
     }
   }
   return '—';
@@ -52,6 +58,7 @@ function computeVals(data) {
   const checkBase = 'width: 44px; height: 36px; border: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer;';
 
   const exercises = w.exercises.map((ex, ei) => {
+    const rec = recommend(data, ex.name);
     const rows = ex.sets.map((s, si) => {
       setCount++;
       const kgNum = parseFloat(String(s.kg).replace(',', '.')) || 0;
@@ -63,8 +70,8 @@ function computeVals(data) {
         s, si,
         n: si + 1,
         prev,
-        kgHint: hint[0] === '—' ? '0' : hint[0],
-        repHint: hint[1] || '0',
+        kgHint: rec ? fmtKgInput(rec.kg) : hint[0] === '—' ? '0' : hint[0],
+        repHint: rec ? String(rec.reps[Math.min(si, rec.reps.length - 1)]) : hint[1] || '0',
         rowStyle: rowBase + (s.done ? ' background: var(--accentSoft);' : ''),
         checkStyle: checkBase + (s.done ? ' background: var(--accent); color: var(--onAccent);' : ' background: var(--fill); color: var(--text2);'),
         restBefore: null
@@ -76,14 +83,14 @@ function computeVals(data) {
         rows[i].restBefore = formatRestMs(curSet.doneAt - prevSet.doneAt);
       }
     }
-    return { ex, ei, rows };
+    return { ex, ei, rows, rec };
   });
 
   return { exercises, volume: fmtNum(volume), doneCount, setCount };
 }
 
 function template(w, vm, restLabel) {
-  const exercisesHtml = vm.exercises.map(({ ex, ei, rows }) => `
+  const exercisesHtml = vm.exercises.map(({ ex, ei, rows, rec }) => `
 <section style="background: var(--card); border-radius: 22px; padding: 16px 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow)">
 <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px">
 <div style="display: flex; flex-direction: column; gap: 2px">
@@ -94,6 +101,15 @@ function template(w, vm, restLabel) {
 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
 </button>
 </div>
+${rec ? `
+<div style="margin: 0 4px; padding: 10px 10px 10px 12px; border-radius: 12px; background: var(--fill); display: flex; align-items: center; gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0">
+<div style="font-size: 14px; font-weight: 700; color: ${REC_COLORS[rec.type]}">${REC_ICONS[rec.type]} Predlog: ${rec.title}</div>
+<div style="font-size: 12px; color: var(--text2)">${rec.reason}</div>
+<div style="font-size: 12px; color: var(--text2)">Zadnjič: ${rec.last}</div>
+</div>
+<button type="button" data-action="applyRec" data-ei="${ei}" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--accent); color: var(--onAccent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0">Uporabi</button>
+</div>` : ''}
 <div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) 64px 56px 44px; gap: 8px; padding: 0 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text2)">
 <div style="text-align: center">Ser.</div>
 <div>Prejšnje</div>
@@ -160,7 +176,7 @@ Dodaj vajo
 </button>
 </main>
 
-<footer style="position: fixed; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 20px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; background: var(--bar); border-top: 1px solid var(--line); max-width: 560px; margin: 0 auto; left: 50%; transform: translateX(-50%)">
+<footer style="position: fixed; bottom: 0; width: 100%; box-sizing: border-box; padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 20px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; background: var(--bar); border-top: 1px solid var(--line); max-width: 560px; margin: 0 auto; left: 50%; transform: translateX(-50%)">
 <button type="button" data-action="saveTemplate" style="height: 52px; border: 0; border-radius: 16px; background: var(--fill); color: var(--text); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">Shrani kot predlogo</button>
 <button type="button" data-action="finish" style="height: 52px; border: 0; border-radius: 16px; background: var(--accent); color: var(--onAccent); display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 15px; font-weight: 600; cursor: pointer">Končaj trening</button>
 </footer>`;
@@ -212,10 +228,33 @@ export function mount(root, ctx) {
       btn.addEventListener('click', (e) => {
         const ei = Number(btn.getAttribute('data-ei'));
         const si = Number(btn.getAttribute('data-si'));
+        // Ticking an empty set accepts the suggested values shown as placeholders.
+        const kgIn = root.querySelector(`input[data-field="kg"][data-ei="${ei}"][data-si="${si}"]`);
+        const repIn = root.querySelector(`input[data-field="reps"][data-ei="${ei}"][data-si="${si}"]`);
         mutate(w => {
           const set = w.exercises[ei].sets[si];
           set.done = !set.done;
           set.doneAt = set.done ? Date.now() : undefined;
+          if (set.done && Number(repIn?.placeholder) > 0) {
+            if (String(set.kg).trim() === '') set.kg = kgIn.placeholder;
+            if (String(set.reps).trim() === '') set.reps = repIn.placeholder;
+          }
+        });
+      });
+    });
+    root.querySelectorAll('[data-action="applyRec"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ei = Number(btn.getAttribute('data-ei'));
+        const rec = recommend(store.data, store.data.activeWorkout.exercises[ei].name);
+        if (!rec) return;
+        mutate(w => {
+          const sets = w.exercises[ei].sets;
+          while (sets.length < rec.sets) sets.push({ kg: '', reps: '', done: false });
+          for (let i = 0; i < rec.sets; i++) {
+            if (sets[i].done) continue;
+            sets[i].kg = fmtKgInput(rec.kg);
+            sets[i].reps = String(rec.reps[i]);
+          }
         });
       });
     });

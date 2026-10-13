@@ -2,6 +2,32 @@ import { store } from '../state.js';
 import { fromIso, fmtDate, fmtDateShort, fmtNum, fmtNum1, escapeHtml } from '../util.js';
 import { exerciseHistory } from '../stats.js';
 import { lineChartHtml } from '../components/lineChart.js';
+import { recommend, ruleFor, setRule } from '../progression.js';
+
+function progressionHtml(name) {
+  const rule = ruleFor(store.data, name);
+  const rec = rule.off ? null : recommend(store.data, name);
+  const step = String(rule.step).replace('.', ',');
+  const btn = (action, label) => `<button type="button" data-action="${action}" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--fill); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">${label}</button>`;
+  return `<section style="background: var(--card); border-radius: 22px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow)">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600">Napredovanje</h2>
+<span style="font-size: 12px; color: var(--text2)">${rule.label}</span>
+</div>
+${rule.off
+    ? '<div style="font-size: 14px; color: var(--text2)">Predlogi za to vajo so izklopljeni.</div>'
+    : `<div style="font-size: 14px">Double progression: ${rule.min}–${rule.max} ponovitev, nato +${step} kg.</div>
+${rec ? `<div style="background: var(--fill); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 12px; color: var(--text2)">Naslednjič</span>
+<span style="font-size: 16px; font-weight: 700">${rec.title}</span>
+<span style="font-size: 12px; color: var(--text2)">${rec.reason}</span>
+</div>` : '<div style="font-size: 13px; color: var(--text2)">Predlog se pokaže, ko vajo prvič zabeležiš.</div>'}`}
+<div style="display: flex; gap: 8px; flex-wrap: wrap">
+${rule.off ? '' : btn('editRange', `Razpon ${rule.min}–${rule.max}`) + btn('editStep', `Korak ${step} kg`)}
+${btn('toggleProgression', rule.off ? 'Vklopi predloge' : 'Izklopi')}
+</div>
+</section>`;
+}
 
 const METRICS = [
   { key: 'topKg', label: 'Teža', unit: 'kg', fmt: v => fmtNum1(v), color: 'var(--accent)', title: 'Najtežji dvig' },
@@ -129,6 +155,8 @@ ${segHtml(RANGES, rangeIdx, 'range')}
 </div>
 </section>
 
+${progressionHtml(vm.name)}
+
 <section style="background: var(--card); border-radius: 22px; padding: 10px 18px 6px; display: flex; flex-direction: column; box-shadow: var(--shadow)">
 <h2 style="margin: 6px 0 2px; font-size: 15px; font-weight: 600">Zgodovina</h2>
 ${sessionsHtml}
@@ -147,6 +175,22 @@ export function mount(root, ctx) {
     });
     root.querySelectorAll('[data-action="metric"]').forEach(b => b.addEventListener('click', () => { metricIdx = Number(b.dataset.i); render(); }));
     root.querySelectorAll('[data-action="range"]').forEach(b => b.addEventListener('click', () => { rangeIdx = Number(b.dataset.i); render(); }));
+    root.querySelector('[data-action="editRange"]')?.addEventListener('click', () => {
+      const r = ruleFor(store.data, name);
+      const val = prompt('Razpon ponovitev (npr. 6-8):', `${r.min}-${r.max}`);
+      const m = /^\s*(\d{1,2})\s*[-–]\s*(\d{1,2})\s*$/.exec(val || '');
+      if (m && Number(m[1]) >= 1 && Number(m[2]) > Number(m[1])) { setRule(store.data, name, { min: Number(m[1]), max: Number(m[2]) }); store.save(); }
+    });
+    root.querySelector('[data-action="editStep"]')?.addEventListener('click', () => {
+      const r = ruleFor(store.data, name);
+      const val = prompt('Korak teže v kg (npr. 2,5):', String(r.step).replace('.', ','));
+      const num = parseFloat(String(val || '').replace(',', '.'));
+      if (num > 0 && num <= 50) { setRule(store.data, name, { step: num }); store.save(); }
+    });
+    root.querySelector('[data-action="toggleProgression"]').addEventListener('click', () => {
+      setRule(store.data, name, { off: !ruleFor(store.data, name).off });
+      store.save();
+    });
   }
   render();
   return store.subscribe(render);
