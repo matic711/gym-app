@@ -124,7 +124,7 @@ ${(() => {
 ${list.length ? list.map((x, i) => `<a href="#/vaja?name=${encodeURIComponent(x.name)}" style="padding: 10px 0; display: flex; justify-content: space-between; gap: 8px; text-decoration: none; color: var(--text); ${i ? 'border-top: 1px solid var(--line);' : ''}">
 <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 15px; font-weight: 600">${escapeHtml(x.name)}</span><span style="font-size: 12px; color: var(--text2)">Najboljše ${x.best} · ${x.sessions} treningov brez napredka</span></span>
 <span style="font-size: 13px; font-weight: 700; flex-shrink: 0; color: ${x.cut ? 'var(--accentText)' : x.long ? 'var(--danger)' : 'var(--mood)'}">${x.weeks} t.${x.cut ? ' · cut' : ''}</span>
-</a>`).join('') : '<div style="font-size: 14px; color: var(--good); padding: 6px 0 10px">Nobena vaja ne stoji. 👍</div>'}
+</a>`).join('') : '<div style="font-size: 14px; color: var(--good); padding: 6px 0 10px">Nobena vaja ne stoji.</div>'}
 </section>`;
 })()}
 

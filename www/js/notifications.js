@@ -18,7 +18,7 @@ function at(date, { h, m }) {
 // as long as the day is still not logged.
 const MORNING_REPEATS = [0, 60, 120, 180, 300, 540];
 const MORNING_TEXTS = [
-  ['Dobro jutro ☀️', 'Jutranji vpis: teža, spanec, stres — 20 sekund.'],
+  ['Dobro jutro', 'Jutranji vpis: teža, spanec, stres — 20 sekund.'],
   ['Jutranji vpis čaka', 'Stehtaj se in vpiši, kako si spal.'],
   ['Še vedno brez vpisa', 'Brez vpisov analiza ne ve, kaj vpliva na tvoje lifte.'],
   ['Jutranji vpis', 'Danes še nisi vpisal teže in spanca.'],
@@ -47,15 +47,15 @@ export function planNotifications(data, now = new Date()) {
     }
     if (t.remindTraining !== false && !(d === 0 && data.activeWorkout)) {
       const need = trainingNeed(data, day);
-      if (need) out.push({ id: ID_BASE + d * 10 + 8, title: need.urgent ? 'Danes je dan za trening 💪' : 'Čas je za trening', body: need.reason + '.', at: at(day, REMIND_TIMES.training) });
+      if (need) out.push({ id: ID_BASE + d * 10 + 8, title: need.urgent ? 'Danes je dan za trening' : 'Čas je za trening', body: need.reason + '.', at: at(day, REMIND_TIMES.training) });
     }
     if (t.reportWeekly !== false && dowMon(day) === 6) {
-      out.push({ id: ID_BASE + d * 10 + 9, title: 'Tedensko poročilo 📊', body: 'Poglej, kako je šlo ta teden in na kaj se osredotočiti naslednji.', at: at(day, REMIND_TIMES.report),
+      out.push({ id: ID_BASE + d * 10 + 9, title: 'Tedensko poročilo', body: 'Poglej, kako je šlo ta teden in na kaj se osredotočiti naslednji.', at: at(day, REMIND_TIMES.report),
         extra: { route: 'porocilo', params: { kind: 'week', date: isoDate(startOfWeek(day)) } } });
     }
     const lastOfMonth = new Date(day.getFullYear(), day.getMonth() + 1, 0).getDate();
     if (t.reportMonthly !== false && day.getDate() === lastOfMonth) {
-      out.push({ id: ID_BASE + 80 + d, title: 'Mesečno poročilo 📈', body: 'Mesec je naokoli — poglej napredek, rekorde in platoje.', at: at(day, { h: REMIND_TIMES.report.h, m: REMIND_TIMES.report.m + 1 }),
+      out.push({ id: ID_BASE + 80 + d, title: 'Mesečno poročilo', body: 'Mesec je naokoli — poglej napredek, rekorde in platoje.', at: at(day, { h: REMIND_TIMES.report.h, m: REMIND_TIMES.report.m + 1 }),
         extra: { route: 'porocilo', params: { kind: 'month', date: isoDate(new Date(day.getFullYear(), day.getMonth(), 1)) } } });
     }
   }

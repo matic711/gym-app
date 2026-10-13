@@ -198,7 +198,7 @@ function volumeRank(data, kind, p, volume) {
     count++;
     if (v >= volume) best = false;
   }
-  return best && count >= 3 ? `Po volumnu je to tvoj najboljši ${kind === 'month' ? 'mesec' : 'teden'} v zadnjih ${count + 1} ${kind === 'month' ? 'mesecih' : 'tednih'}. 🔥` : null;
+  return best && count >= 3 ? `Po volumnu je to tvoj najboljši ${kind === 'month' ? 'mesec' : 'teden'} v zadnjih ${count + 1} ${kind === 'month' ? 'mesecih' : 'tednih'}.` : null;
 }
 
 function kgStr(kg) { return Number.isInteger(kg) ? String(kg) : String(kg).replace('.', ','); }
@@ -220,7 +220,7 @@ function narrative(r) {
     else if (r.volumeChange != null && Math.abs(r.volumeChange) >= 0.05) s.push(`Volumen je bil ${Math.round(Math.abs(r.volumeChange) * 100)} % ${r.volumeChange > 0 ? 'večji' : 'manjši'} kot ${month ? 'prejšnji mesec' : 'prejšnji teden'}${r.inProgress ? ' v istem času' : ''}.`);
   }
   if (r.records.length) {
-    s.push(`${r.records.length === 1 ? 'Nov rekord' : `${r.records.length} novi rekordi`}: ${r.records.slice(0, 3).map(x => `${x.name} ${x.text}`).join(', ')}! 🎉`);
+    s.push(`${r.records.length === 1 ? 'Nov rekord' : `${r.records.length} novi rekordi`}: ${r.records.slice(0, 3).map(x => `${x.name} ${x.text}`).join(', ')}.`);
   } else if (r.bestLift) {
     s.push(`Najtežji dvig: ${r.bestLift.name} ${kgStr(r.bestLift.kg)} kg × ${r.bestLift.reps}.`);
   }
@@ -242,7 +242,7 @@ function narrative(r) {
     const text = well.join(', ');
     s.push(text.charAt(0).toUpperCase() + text.slice(1) + '.');
   }
-  if (w.possible >= 3) s.push(w.logged >= w.possible ? 'Vpisal si vsak dan. 👏' : `Vpisanih je ${w.logged} od ${w.possible} dni.`);
+  if (w.possible >= 3) s.push(w.logged >= w.possible ? 'Vpisal si vsak dan.' : `Vpisanih je ${w.logged} od ${w.possible} dni.`);
   const stuck = r.plateaus.filter(x => !x.cut);
   if (stuck.length) {
     const names = stuck.slice(0, 2).map(x => x.name).join(' in ');

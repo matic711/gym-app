@@ -22,9 +22,9 @@ function template(r, kind) {
 
   const chips = [
     chip(`${r.workouts}${r.goal ? `/${r.goal}` : ''} ${plural(r.workouts, ['trening', 'treninga', 'treningi', 'treningov']).replace(/^\d+ /, '')}`, r.goal && !r.inProgress ? (r.workouts >= r.goal ? 'var(--good)' : 'var(--danger)') : ''),
-    r.records.length ? chip(`🏆 ${plural(r.records.length, ['rekord', 'rekorda', 'rekordi', 'rekordov'])}`, 'var(--good)') : '',
-    w.sleep != null ? chip(`😴 ${hm(w.sleep)}`, w.sleep < 7 * 60 ? 'var(--mood)' : '') : '',
-    w.weightNow != null ? chip(`⚖️ ${fmtNum1(w.weightNow)} kg`) : ''
+    r.records.length ? chip(`${plural(r.records.length, ['rekord', 'rekorda', 'rekordi', 'rekordov'])}`, 'var(--good)') : '',
+    w.sleep != null ? chip(`spanec ${hm(w.sleep)}`, w.sleep < 7 * 60 ? 'var(--mood)' : '') : '',
+    w.weightNow != null ? chip(`teža ${fmtNum1(w.weightNow)} kg`) : ''
   ].filter(Boolean).join('');
 
   return `
