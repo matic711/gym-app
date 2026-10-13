@@ -106,7 +106,8 @@ ${rec ? `
 <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0">
 <div style="font-size: 14px; font-weight: 700; color: ${REC_COLORS[rec.type]}">${REC_ICONS[rec.type]} Predlog: ${rec.title}</div>
 <div style="font-size: 12px; color: var(--text2)">${rec.reason}</div>
-<div style="font-size: 12px; color: var(--text2)">Zadnjič: ${rec.last}</div>
+<div style="font-size: 12px; color: var(--text2)">${rec.note ? 'Osnova' : 'Zadnjič'}: ${rec.last}</div>
+${rec.note ? `<div style="font-size: 12px; color: var(--mood)">${rec.note}</div>` : ''}
 </div>
 <button type="button" data-action="applyRec" data-ei="${ei}" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--accent); color: var(--onAccent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0">Uporabi</button>
 </div>` : ''}

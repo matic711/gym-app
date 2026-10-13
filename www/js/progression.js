@@ -4,7 +4,7 @@
 // bottom. No program needed — only the exercise's own history.
 import { EXERCISE_LIBRARY } from './exercises.js';
 import { exerciseHistory } from './stats.js';
-import { isoDate } from './util.js';
+import { isoDate, fromIso, fmtDateShort } from './util.js';
 import { sleepMinutes } from './analysis.js';
 
 const LOWER_COMPOUND = ['squat', 'front squat', 'hack squat', 'deadlift', 'romanian deadlift', 'leg press', 'hip thrust', 'good morning'];
@@ -84,6 +84,27 @@ export function recommend(data, name, now = new Date()) {
   const hist = exerciseHistory(data, name).filter(h => h.dateISO <= todayIso);
   if (!hist.length) return null;
 
+  // A lighter-than-usual session (a bad day) shouldn't reset the baseline: when
+  // the last working weight is at least 5 % under the session before it, suggest
+  // from that earlier session. Two light sessions in a row are a new level
+  // (cut, deload) and count as normal; so does a light session that was the
+  // deload this function asked for.
+  if (hist.length >= 2) {
+    const last = hist[hist.length - 1], prev = hist[hist.length - 2];
+    const lt = workingSets(last).top, pt = workingSets(prev).top;
+    const gapDays = Math.round((fromIso(last.dateISO) - fromIso(prev.dateISO)) / 86400000);
+    if (lt > 0 && pt > 0 && lt < pt * 0.95 && gapDays <= 28) {
+      const base = suggestFrom(data, hist.slice(0, -1), rule, now);
+      if (base && base.type !== 'deload') {
+        return { ...base, last: `${base.last} (${fmtDateShort(fromIso(prev.dateISO))})`,
+          note: `Zadnji trening (${fmt(lt)} kg) je bil lažji, zato ga predlog ne upošteva.` };
+      }
+    }
+  }
+  return suggestFrom(data, hist, rule, now);
+}
+
+function suggestFrom(data, hist, rule, now) {
   const last = workingSets(hist[hist.length - 1]);
   if (!last.sets.length) return null;
   const reps = last.sets.map(s => s.reps);

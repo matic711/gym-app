@@ -21,6 +21,7 @@ ${rec ? `<div style="background: var(--fill); border-radius: 12px; padding: 10px
 <span style="font-size: 12px; color: var(--text2)">Naslednjič</span>
 <span style="font-size: 16px; font-weight: 700">${rec.title}</span>
 <span style="font-size: 12px; color: var(--text2)">${rec.reason}</span>
+${rec.note ? `<span style="font-size: 12px; color: var(--mood)">${rec.note}</span>` : ''}
 </div>` : '<div style="font-size: 13px; color: var(--text2)">Predlog se pokaže, ko vajo prvič zabeležiš.</div>'}`}
 <div style="display: flex; gap: 8px; flex-wrap: wrap">
 ${rule.off ? '' : btn('editRange', `Razpon ${rule.min}–${rule.max}`) + btn('editStep', `Korak ${step} kg`)}

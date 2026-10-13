@@ -24,6 +24,8 @@ Za vsako vajo pogleda zadnji trening te vaje (delovne serije = serije z najvišj
 - sicer ista teža in +1 ponovitev (pod spodnjo mejo: cilj spodnja meja),
 - dvakrat zapored pod razponom pri isti teži → −10 % (deload),
 - slab jutranji vpis (spanec < 6 h, kakovost 1/5 ali stres ≥ 8) → namesto dviga „drži težo“.
+- lažji trening (delovna teža ≥ 5 % pod prejšnjim treningom) se preskoči in predlog izhaja iz
+  zadnjega normalnega; dvakrat zapored lažje (ali deload, ki ga je predlagala aplikacija) je nova raven.
 
 Privzeto: compound 6–8 pon. (noge +5 kg, ostalo +2,5 kg), izolacija in kabli 10–15 pon. +2,5 kg,
 lastna teža 6–12 pon. nato +2,5 kg uteži; core/kardio brez predlogov. Za vsako vajo se nastavi
