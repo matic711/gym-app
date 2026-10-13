@@ -1,6 +1,5 @@
 import { store, migrate } from '../state.js';
 import { APP_VERSION, checkForUpdate, openDownload } from '../updates.js';
-import { isDark } from '../theme.js';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
@@ -33,8 +32,7 @@ function restLabel(sec) {
 
 function template() {
   const s = store.data.settings;
-  const dark = isDark(s);
-  const pick = s.themePick || (dark ? 'Temna' : 'Svetla');
+  const pick = s.themePick === 'Temna' || s.themePick === 'Svetla' ? s.themePick : 'Sistem';
   const w = s.weightUnit === 'kg';
   const heightDisplay = s.heightUnit === 'cm' ? `${s.heightCm} cm` : `${Math.floor(s.heightCm / 30.48)} ft ${Math.round((s.heightCm / 2.54) % 12)} in`;
   const goalWeightDisplay = w ? `${s.goalWeightKg.toFixed(1).replace('.', ',')} kg` : `${(s.goalWeightKg * 2.2046).toFixed(1).replace('.', ',')} lb`;

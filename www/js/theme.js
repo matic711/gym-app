@@ -1,3 +1,6 @@
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
+
 export function palette(dark, accent) {
   const a = accent;
   const custom = a && a.toLowerCase() !== '#1f63e8';
@@ -20,5 +23,12 @@ export function applyTheme(settings) {
   for (const [k, v] of Object.entries(p)) root.setProperty('--' + k, v);
   root.setProperty('--text-scale', String(TEXT_SCALE[settings.textSize] || 1));
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', p.bg);
+  // Phone status bar (clock, battery) follows the app theme.
+  if (Capacitor.isNativePlatform()) {
+    StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light }).catch(() => {});
+    StatusBar.setBackgroundColor({ color: p.bg }).catch(() => {});
+  }
   return { dark, p };
 }

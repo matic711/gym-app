@@ -67,7 +67,7 @@ function computeViewModel() {
     const tpl = data.templates[0];
     nextCard = tpl ? {
       label: 'Naslednji trening',
-      title: `${tpl.name} · ${tpl.summary}`,
+      title: tpl.summary ? `${tpl.name} · ${tpl.summary}` : tpl.name,
       meta: `${tpl.exercises.length} vaj · ~${Math.round(tpl.exercises.length * 9.2)} min · predloga`,
       cta: 'Začni',
       target: 'nov',

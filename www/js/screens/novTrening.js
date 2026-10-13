@@ -31,7 +31,7 @@ function ensureActiveWorkout(ctx) {
   if (tplId) {
     const tpl = data.templates.find(t => t.id === tplId);
     if (tpl) {
-      name = `${tpl.name} · ${tpl.summary}`;
+      name = tpl.summary ? `${tpl.name} · ${tpl.summary}` : tpl.name;
       exercises = tpl.exercises.map(ex => ({
         name: ex.name, muscle: ex.muscle,
         sets: [0, 1, 2].map(() => ({ kg: '', reps: '', done: false }))
