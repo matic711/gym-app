@@ -1,4 +1,6 @@
 import { store, migrate } from '../state.js';
+import { goalsOf, suggestGoals, ownProducts } from '../nutrition.js';
+import { openOwnProducts } from '../components/foodSheets.js';
 import { APP_VERSION, checkForUpdate, openDownload } from '../updates.js';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -144,6 +146,21 @@ ${switchRow('Počutje', 'Lestvica 1–5', t.trackMood, 'trackMood', false)}
 ${switchRow('Energija', 'Lestvica 1–10', t.trackEnergy, 'trackEnergy', false)}
 ${switchRow('Stres', 'Lestvica 1–10', t.trackStress, 'trackStress', false)}
 ${switchRow('Obseg pasu', 'Tedenski vpis · ' + (s.heightUnit === 'cm' ? 'cm' : 'in'), t.trackWaist, 'trackWaist', false)}
+</section>
+
+<h2 style="margin: 18px 16px 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text2)">Prehrana</h2>
+<section style="background: var(--card); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow)">
+${switchRow('Beleženje prehrane', 'Kalorije, makrohranila, skeniranje izdelkov', t.nutrition, 'nutrition', true)}
+${t.nutrition ? (() => {
+    const g = goalsOf(store.data);
+    const row = (key, label, value) => `<button type="button" data-ngoal="${key}" style="width: 100%; min-height: 52px; border: 0; border-top: 1px solid var(--line); background: transparent; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font: inherit; color: var(--text); cursor: pointer">
+<span style="font-size: 16px">${label}</span>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text2)">${value}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></span>
+</button>`;
+    return row('kcal', 'Cilj kalorij', `${g.kcal} kcal`) + row('protein', 'Beljakovine', `${g.protein} g`) + row('carbs', 'Ogljikovi hidrati', `${g.carbs} g`) + row('fat', 'Maščobe', `${g.fat} g`) +
+      `<button type="button" data-action="suggestGoals" style="width: 100%; min-height: 52px; border: 0; border-top: 1px solid var(--line); background: transparent; padding: 0 16px; font: inherit; font-size: 16px; font-weight: 600; color: var(--accentText); text-align: left; cursor: pointer">Predlagaj cilje glede na težo</button>
+<button type="button" data-action="ownProducts" style="width: 100%; min-height: 52px; border: 0; border-top: 1px solid var(--line); background: transparent; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font: inherit; color: var(--text); cursor: pointer"><span style="font-size: 16px">Moji izdelki</span><span style="font-size: 15px; color: var(--text2)">${ownProducts(store.data).length}</span></button>`;
+  })() : ''}
 </section>
 
 <h2 style="margin: 18px 16px 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text2)">Opomniki</h2>
@@ -316,6 +333,26 @@ export function mount(root, ctx) {
     root.querySelector('[data-action="goalUp"]').addEventListener('click', () => {
       setSetting({ goalPerWeek: Math.min(7, store.data.settings.goalPerWeek + 1) });
     });
+    root.querySelectorAll('[data-ngoal]').forEach(btn => btn.addEventListener('click', () => {
+      const key = btn.dataset.ngoal;
+      const labels = { kcal: 'Cilj kalorij (kcal):', protein: 'Beljakovine (g):', carbs: 'Ogljikovi hidrati (g):', fat: 'Maščobe (g):' };
+      const cur = goalsOf(store.data);
+      const val = prompt(labels[key], String(cur[key]));
+      const n = parseInt(val, 10);
+      if (val != null && n > 0 && n < 10000) setSetting({ nutritionGoals: { ...cur, [key]: n } });
+    }));
+    root.querySelector('[data-action="suggestGoals"]')?.addEventListener('click', () => {
+      const mode = prompt('Cilj: vpiši "cut" (hujšanje), "vzdrževanje" ali "masa"', 'vzdrževanje');
+      if (mode == null) return;
+      const m = /cut|huj/i.test(mode) ? 'cut' : /mas|bulk/i.test(mode) ? 'bulk' : 'maintain';
+      const weights = Object.entries(store.data.wellness).filter(([, e]) => e.weight).sort(([a], [b]) => a.localeCompare(b));
+      const w = weights.length ? weights[weights.length - 1][1].weight : null;
+      const g = suggestGoals(w, m);
+      if (confirm(`Predlog${w ? ` za ${String(w).replace('.', ',')} kg` : ''}: ${g.kcal} kcal, beljakovine ${g.protein} g, OH ${g.carbs} g, maščobe ${g.fat} g. Gre za grob začetni približek — prilagodi ga po 2–3 tednih glede na spremembo teže. Uporabim?`)) {
+        setSetting({ nutritionGoals: g });
+      }
+    });
+    root.querySelector('[data-action="ownProducts"]')?.addEventListener('click', openOwnProducts);
     root.querySelector('[data-action="editPlateau"]').addEventListener('click', () => {
       const val = prompt('Plato po koliko tednih brez napredka? (2–16)', String(store.data.settings.plateauWeeks || 4));
       const n = parseInt(val, 10);

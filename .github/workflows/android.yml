@@ -68,8 +68,15 @@ jobs:
               buildTypes {
                   debug { signingConfig signingConfigs.app }
               }
+              // Required by @capacitor-mlkit/barcode-scanning
+              buildFeatures {
+                  dataBinding true
+              }
           }
           GRADLE
+          # Google's ready-made barcode scanner UI (downloaded with the app via Play services)
+          sed -i 's#</application>#    <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui"/>\n    </application>#' android/app/src/main/AndroidManifest.xml
+          grep -q 'barcode_ui' android/app/src/main/AndroidManifest.xml
           npx cap sync android
 
       - name: Build APK

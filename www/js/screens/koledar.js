@@ -1,6 +1,7 @@
 import { store } from '../state.js';
 import { isoDate, addDays, fromIso, startOfWeek, fmtWeekday, fmtDate, fmtNum, fmtNum1, workoutVolume, escapeHtml, plural, MONTHS, DOW_SHORT } from '../util.js';
 import { sessionPerformances, sleepMinutes, pct, hm } from '../analysis.js';
+import { nutritionEnabled, dayTotals, goalsOf, MEALS } from '../nutrition.js';
 
 const MOOD_LABELS = ['Slabo', 'Meh', 'V redu', 'Dobro', 'Odlično'];
 
@@ -149,6 +150,19 @@ ${monthGrid(month, data, selectedIso, todayIso)}
 
 <h2 id="day-overview" style="margin: 6px 2px 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em">${fmtWeekday(selDate)}, ${fmtDate(selDate)}</h2>
 ${wellnessHtml(data.wellness[selectedIso], selectedIso, todayIso)}
+${nutritionEnabled(data) && selectedIso <= todayIso ? (() => {
+  const t = dayTotals(data, selectedIso), g = goalsOf(data);
+  const meals = MEALS.filter(m => t.byMeal[m.key].entries.length).map(m => `${m.label} ${fmtNum(t.byMeal[m.key].kcal)}`).join(' · ');
+  return `<section style="background: var(--card); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow)">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h3 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--good)">Prehrana</h3>
+<a href="#/prehrana?date=${selectedIso}" style="font-size: 15px; font-weight: 600; color: var(--accentText); text-decoration: none; padding: 6px 0">${t.kcal ? 'Odpri' : 'Vpiši'}</a>
+</div>
+${t.kcal ? `<div style="font-size: 20px; font-weight: 700">${fmtNum(t.kcal)} <span style="font-size: 14px; font-weight: 500; color: var(--text2)">/ ${fmtNum(g.kcal)} kcal</span></div>
+<div style="font-size: 13px; color: var(--text2)">Beljakovine ${fmtNum(t.protein)} g · OH ${fmtNum(t.carbs)} g · M ${fmtNum(t.fat)} g</div>
+<div style="font-size: 13px; color: var(--text2)">${meals}</div>` : '<div style="font-size: 14px; color: var(--text2)">Ta dan ni vpisane hrane.</div>'}
+</section>`;
+})() : ''}
 ${dayWorkouts.length ? dayWorkouts.map(w => workoutHtml(w, perfById.get(w.id))).join('') : `
 <section style="background: var(--card); border-radius: 22px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: var(--shadow)">
 <div style="font-size: 14px; color: var(--text2)">${selectedIso > todayIso ? 'Ni načrtovanega treninga.' : 'Ta dan ni treninga.'}</div>

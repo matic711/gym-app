@@ -154,6 +154,7 @@ function defaultSettings() {
       remindMood: true, remindWeigh: false, remindTraining: true,
       remindMorning: true, morningGate: true,
       reportWeekly: true, reportMonthly: true,
+      nutrition: false,
       autoBackup: true
     },
     lastBackupAt: null

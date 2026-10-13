@@ -49,6 +49,13 @@ ali več ponovitev pri najboljši teži) minejo vsaj N tednov (privzeto 4) in vs
 Če je telesna teža v tem času padla za 2 % ali več, je označeno kot cut (moč drži). Predlogi: spanec/stres,
 deload, sprememba razpona, dodatna serija, varianta vaje.
 
+## Prehrana (neobvezno, `www/js/nutrition.js`, zaslon `prehrana`)
+Vklopi se v Nastavitve → Prehrana; izklopljena je povsod skrita (podatki ostanejo). Dnevni vnos po obrokih,
+kalorije in makrohranila glede na cilje (ročno ali „Predlagaj cilje“ iz telesne teže). Izdelki:
+iskanje v bazi Open Food Facts, skeniranje črtne kode (Google ML Kit skener, `www/js/scanner.js`,
+brez dovoljenja za kamero), lastni izdelki s črtno kodo, ki jih skener potem najde. Uporabljeni izdelki
+iz baze se shranijo lokalno za uporabo brez povezave. Povzetek na Domov, v koledarju in poročilih.
+
 ## Jutranji vpis
 Dokler današnji dan ni vpisan (od 4:00 naprej), aplikacija pokaže samo zaslon „Dobro jutro“
 (izklopiš v Nastavitve → Opomniki → Zakleni aplikacijo do vpisa). Obvestilo pride ob nastavljeni uri

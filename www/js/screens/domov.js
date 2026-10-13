@@ -2,6 +2,7 @@ import { store } from '../state.js';
 import { computeReminders, logStreak } from '../reminders.js';
 import { formReport } from '../analysis.js';
 import { pendingReport } from '../reports.js';
+import { nutritionEnabled, dayTotals, goalsOf } from '../nutrition.js';
 import { isoDate, addDays, startOfWeek, fromIso, fmtWeekday, fmtDate, fmtNum, fmtNum1, workoutVolume, workoutSetCount } from '../util.js';
 
 const MOOD_LABELS = ['Slabo', 'Meh', 'V redu', 'Dobro', 'Odlično'];
@@ -106,6 +107,7 @@ function computeViewModel() {
     volumeMeta: `Ta teden · ${done} ${treningWord(done)}`,
     reminders: computeReminders(data, today),
     report: pendingReport(data, today),
+    food: nutritionEnabled(data) ? { t: dayTotals(data, todayIso), g: goalsOf(data) } : null,
     formWarning: (() => {
       const rep = formReport(data, today);
       if (!rep.slacking) return null;
@@ -258,6 +260,21 @@ Volumen
 <div style="font-size: 12px; color: var(--text2)">${vm.volumeMeta}</div>
 </article>
 </div>
+
+${vm.food ? (() => {
+  const { t, g } = vm.food;
+  const pct = Math.min(100, Math.round(t.kcal / g.kcal * 100));
+  const left = g.kcal - t.kcal;
+  return `<a href="#/prehrana" style="background: var(--card); border-radius: 20px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: var(--text); box-shadow: var(--shadow)">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<span style="display: flex; align-items: center; gap: 6px; color: var(--good); font-size: 13px; font-weight: 600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-1.7 0-3 2.2-3 5s1.3 4 3 4v9"></path></svg>Prehrana</span>
+<span style="font-size: 12px; color: ${left < 0 ? 'var(--danger)' : 'var(--text2)'}">${left >= 0 ? `še ${fmtNum(left)} kcal` : `${fmtNum(-left)} kcal nad ciljem`}</span>
+</div>
+<div style="font-size: 22px; font-weight: 700">${fmtNum(t.kcal)} <span style="font-size: 14px; font-weight: 500; color: var(--text2)">/ ${fmtNum(g.kcal)} kcal</span></div>
+<div style="height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden"><div style="width: ${pct}%; height: 6px; border-radius: 3px; background: var(--accent)"></div></div>
+<div style="font-size: 12px; color: var(--text2)">Beljakovine ${fmtNum(t.protein)}/${g.protein} g · OH ${fmtNum(t.carbs)}/${g.carbs} g · M ${fmtNum(t.fat)}/${g.fat} g</div>
+</a>`;
+})() : ''}
 
 ${lastWorkoutHtml}
 </main>`;

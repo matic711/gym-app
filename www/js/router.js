@@ -13,6 +13,7 @@ import * as vaja from './screens/vaja.js';
 import * as forma from './screens/forma.js';
 import * as koledar from './screens/koledar.js';
 import * as porocilo from './screens/porocilo.js';
+import * as prehrana from './screens/prehrana.js';
 
 const SCREENS = {
   home: { mod: domov, tab: 'home' },
@@ -22,6 +23,7 @@ const SCREENS = {
   zdravje: { mod: zdravje, tab: 'koledar' },
   koledar: { mod: koledar, tab: 'koledar' },
   porocilo: { mod: porocilo, tab: 'analitika' },
+  prehrana: { mod: prehrana, tab: 'home' },
   analitika: { mod: analitika, tab: 'analitika' },
   nastavitve: { mod: nastavitve, tab: 'nastavitve' },
   uredi: { mod: urediTrening, tab: null },

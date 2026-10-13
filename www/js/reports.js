@@ -5,6 +5,7 @@ import { exerciseHistory, allExercises } from './stats.js';
 import { workingSets } from './progression.js';
 import { progressDates, detectPlateaus } from './plateau.js';
 import { sessionPerformances, sleepMinutes } from './analysis.js';
+import { nutritionEnabled, averageIntake, goalsOf } from './nutrition.js';
 
 function mean(xs) { return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null; }
 
@@ -166,7 +167,8 @@ export function buildReport(data, kind, anchor, now = new Date()) {
     volume, prevVolume, volumeChange: prevVolume ? volume / prevVolume - 1 : null,
     form, records, progressed, plateaus, mainLifts: kind === 'month' ? mainLifts(data, p) : [],
     wellness: well, prevWellness: prevWell, insights, focus,
-    bestLift: heaviestLift(data, p), volumeRank: inProgress ? null : volumeRank(data, kind, p, volume)
+    bestLift: heaviestLift(data, p), volumeRank: inProgress ? null : volumeRank(data, kind, p, volume),
+    food: nutritionEnabled(data) ? averageIntake(data, p.startIso, effectiveEndIso) : null, foodGoals: goalsOf(data)
   };
   report.summary = narrative(report);
   return report;
@@ -241,6 +243,10 @@ function narrative(r) {
   if (well.length) {
     const text = well.join(', ');
     s.push(text.charAt(0).toUpperCase() + text.slice(1) + '.');
+  }
+  if (r.food) {
+    const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    s.push(`Prehrana: povprečno ${fmt(r.food.kcal)} kcal in ${fmt(r.food.protein)} g beljakovin na dan (cilj ${fmt(r.foodGoals.kcal)} kcal / ${fmt(r.foodGoals.protein)} g, vpisanih ${plural(r.food.days, ['dan', 'dneva', 'dni', 'dni'])}).`);
   }
   if (w.possible >= 3) s.push(w.logged >= w.possible ? 'Vpisal si vsak dan.' : `Vpisanih je ${w.logged} od ${w.possible} dni.`);
   const stuck = r.plateaus.filter(x => !x.cut);
