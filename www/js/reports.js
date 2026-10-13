@@ -1,6 +1,6 @@
 // Weekly and monthly reports, computed on the fly from the stored data, so any
 // past week or month can be opened again.
-import { isoDate, addDays, fromIso, startOfWeek, fmtDateShort, workoutVolume, MONTHS } from './util.js';
+import { isoDate, addDays, fromIso, startOfWeek, fmtDateShort, workoutVolume, plural, MONTHS } from './util.js';
 import { exerciseHistory, allExercises } from './stats.js';
 import { workingSets } from './progression.js';
 import { progressDates, detectPlateaus } from './plateau.js';
@@ -36,7 +36,7 @@ function wellnessIn(data, fromIso_, toIso_) {
 function fmtKg(kg) { return Number.isInteger(kg) ? String(kg) : String(kg).replace('.', ','); }
 
 // New heaviest working weight (or more reps at the heaviest weight ever) in the period.
-function recordsIn(data, p) {
+export function recordsIn(data, p) {
   const out = [];
   for (const e of allExercises(data)) {
     let bestTop = 0, bestRepsAtTop = 0, seen = false;
@@ -160,13 +160,101 @@ export function buildReport(data, kind, anchor, now = new Date()) {
   else if (well.possible >= 5 && well.logged / well.possible < 0.8) focus = 'Vpisuj vsako jutro — brez tega analiza ne vidi, kaj ti pomaga.';
   else focus = 'Nadaljuj tako. Drži se predlogov teže in poskusi dodati ponovitev, kjer še nisi na vrhu razpona.';
 
-  return {
-    period: p, inProgress, goal,
+  const report = {
+    kind, period: p, inProgress, goal,
     workouts: workouts.length, prevWorkouts: prevWorkouts.length, minutes,
     volume, prevVolume, volumeChange: prevVolume ? volume / prevVolume - 1 : null,
     form, records, progressed, plateaus, mainLifts: kind === 'month' ? mainLifts(data, p) : [],
-    wellness: well, prevWellness: prevWell, insights, focus
+    wellness: well, prevWellness: prevWell, insights, focus,
+    bestLift: heaviestLift(data, p), volumeRank: inProgress ? null : volumeRank(data, kind, p, volume)
   };
+  report.summary = narrative(report);
+  return report;
+}
+
+// Heaviest working set of the period (the exercise with the most weight on the bar).
+function heaviestLift(data, p) {
+  let best = null;
+  for (const w of data.workouts) {
+    if (w.dateISO < p.startIso || w.dateISO > p.endIso) continue;
+    for (const ex of w.exercises) {
+      const ws = workingSets(ex);
+      if (ws.top && (!best || ws.top > best.kg)) best = { name: ex.name, kg: ws.top, reps: Math.max(...ws.sets.map(s => s.reps)) };
+    }
+  }
+  return best;
+}
+
+// "Best week by volume in the last N weeks" (or months), for finished periods.
+function volumeRank(data, kind, p, volume) {
+  if (!volume) return null;
+  const n = kind === 'month' ? 6 : 8;
+  let anchor = p.start, count = 0, best = true;
+  for (let i = 1; i < n; i++) {
+    anchor = shiftPeriod(kind, anchor, -1);
+    const q = periodBounds(kind, anchor);
+    const v = data.workouts.filter(w => w.dateISO >= q.startIso && w.dateISO <= q.endIso).reduce((s, w) => s + workoutVolume(w), 0);
+    if (!v) continue;
+    count++;
+    if (v >= volume) best = false;
+  }
+  return best && count >= 3 ? `Po volumnu je to tvoj najboljši ${kind === 'month' ? 'mesec' : 'teden'} v zadnjih ${count + 1} ${kind === 'month' ? 'mesecih' : 'tednih'}. 🔥` : null;
+}
+
+function kgStr(kg) { return Number.isInteger(kg) ? String(kg) : String(kg).replace('.', ','); }
+function hmStr(min) { return `${Math.floor(min / 60)} h ${String(Math.round(min % 60)).padStart(2, '0')} min`; }
+function weeksStr(n) { return plural(n, ['teden', 'tedna', 'tedne', 'tednov']); }
+
+// The report in a few plain sentences.
+function narrative(r) {
+  const month = r.kind === 'month';
+  const s = [];
+  const w = r.wellness, pw = r.prevWellness;
+  if (!r.workouts) {
+    s.push(r.inProgress ? `${month ? 'Ta mesec' : 'Ta teden'} še nimaš zabeleženega treninga.` : `V ${month ? 'tem mesecu' : 'tem tednu'} ni zabeleženih treningov.`);
+  } else {
+    const lead = r.inProgress ? (month ? 'Ta mesec si do zdaj opravil' : 'Ta teden si do zdaj opravil') : (month ? 'V tem mesecu si opravil' : 'V tem tednu si opravil');
+    const count = r.goal ? `${r.workouts} od ${r.goal} načrtovanih treningov` : plural(r.workouts, ['trening', 'treninga', 'treninge', 'treningov']);
+    s.push(`${lead} ${count}${r.minutes ? ` (skupaj ${hmStr(r.minutes)})` : ''}${!r.inProgress && r.goal && r.workouts >= r.goal ? ' — cilj dosežen.' : '.'}`);
+    if (r.volumeRank) s.push(r.volumeRank);
+    else if (r.volumeChange != null && Math.abs(r.volumeChange) >= 0.05) s.push(`Volumen je bil ${Math.round(Math.abs(r.volumeChange) * 100)} % ${r.volumeChange > 0 ? 'večji' : 'manjši'} kot ${month ? 'prejšnji mesec' : 'prejšnji teden'}${r.inProgress ? ' v istem času' : ''}.`);
+  }
+  if (r.records.length) {
+    s.push(`${r.records.length === 1 ? 'Nov rekord' : `${r.records.length} novi rekordi`}: ${r.records.slice(0, 3).map(x => `${x.name} ${x.text}`).join(', ')}! 🎉`);
+  } else if (r.bestLift) {
+    s.push(`Najtežji dvig: ${r.bestLift.name} ${kgStr(r.bestLift.kg)} kg × ${r.bestLift.reps}.`);
+  }
+  if (r.progressed.length) {
+    s.push(`Napredoval si pri ${r.progressed.length === 1 ? 'eni vaji' : `${r.progressed.length} vajah`}: ${r.progressed.slice(0, 3).map(x => `${x.name} (${x.text})`).join(', ')}.`);
+  }
+  if (month && !r.progressed.length && r.mainLifts.length) {
+    const moved = r.mainLifts.filter(x => x.change > 0).slice(0, 3);
+    if (moved.length) s.push(`Glavni dvigi v tem mesecu: ${moved.map(x => `${x.name} ${kgStr(x.first)} → ${kgStr(x.best)} kg`).join(', ')}.`);
+  }
+  const well = [];
+  if (w.sleep != null) {
+    const d = pw.sleep != null ? Math.round(w.sleep - pw.sleep) : null;
+    well.push(`Spal si povprečno ${hmStr(w.sleep)}${d ? ` (${d > 0 ? '+' : '−'}${Math.abs(d)} min glede na prej)` : ''}`);
+  }
+  if (w.stress != null) well.push(`stres ${String(Math.round(w.stress * 10) / 10).replace('.', ',')}/10`);
+  if (w.weightNow != null) well.push(`teža ${String(Math.round(w.weightNow * 10) / 10).replace('.', ',')} kg${w.weightChange ? ` (${w.weightChange > 0 ? '+' : '−'}${String(Math.round(Math.abs(w.weightChange) * 10) / 10).replace('.', ',')} kg)` : ''}`);
+  if (well.length) {
+    const text = well.join(', ');
+    s.push(text.charAt(0).toUpperCase() + text.slice(1) + '.');
+  }
+  if (w.possible >= 3) s.push(w.logged >= w.possible ? 'Vpisal si vsak dan. 👏' : `Vpisanih je ${w.logged} od ${w.possible} dni.`);
+  const stuck = r.plateaus.filter(x => !x.cut);
+  if (stuck.length) {
+    const names = stuck.slice(0, 2).map(x => x.name).join(' in ');
+    s.push(`${names} ${stuck.length === 1 ? 'stoji' : 'stojita'} že ${weeksStr(stuck[0].weeks)}.`);
+  }
+  return s;
+}
+
+// Plain-text version for sharing.
+export function reportText(r) {
+  const title = `${r.kind === 'month' ? 'Mesečno' : 'Tedensko'} poročilo · ${r.period.label}`;
+  return `${title}\n\n${r.summary.join(' ')}\n\nFokus: ${r.focus}`;
 }
 
 // The report that just became ready and hasn't been opened yet, if any.

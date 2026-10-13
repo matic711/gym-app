@@ -56,7 +56,7 @@ function strengthIndex(ex) {
   return best;
 }
 
-function exerciseSessions(data) {
+export function exerciseSessions(data) {
   const byEx = new Map();
   const workouts = [...data.workouts].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
   for (const w of workouts) {

@@ -31,11 +31,17 @@ Privzeto: compound 6–8 pon. (noge +5 kg, ostalo +2,5 kg), izolacija in kabli 1
 lastna teža 6–12 pon. nato +2,5 kg uteži; core/kardio brez predlogov. Za vsako vajo se nastavi
 na zaslonu vaje (Napredovanje). Med treningom ✓ na prazni seriji prevzame predlagane vrednosti.
 
+## Analitika (zaslon `analitika`)
+Obdobje velja za ves zaslon: Teden in Mesec sta koledarska (kot poročila), 3 mes./Leto/Vse se končajo danes.
+Obdobje v teku se primerja z enakim številom dni prejšnjega. Kartice: Moč (sprememba glede na prej
+in glede na telesno težo, graf, najtežji dvigi), Trening (volumen po dnevih/tednih/mesecih), Rekordi v obdobju,
+Teža, Spanec (4–10 h, cilj 7 h), Počutje (lestvica 1–5, energija, stres), Statistika po vajah.
+
 ## Poročila (`www/js/reports.js`, zaslon `porocilo`)
-Tedensko (nedelja 19:00) in mesečno (zadnji dan v mesecu 19:00) poročilo z obvestilom; na Domov
-kartica, dokler ga ne odpreš. Vsebina: treningi glede na cilj, volumen (obdobje v teku se primerja z
-enakim številom dni prejšnjega), rekordi, napredek vaj, platoji, forma, počutje, fokus za naprej.
-Mesečno še glavni dvigi. Računa se sproti iz podatkov, zato je dostopen arhiv za nazaj.
+Kratek pregled z besedami (ne ponavlja grafov): treningi glede na cilj, uvrstitev po volumnu, novi rekordi
+ali najtežji dvig, napredek, povprečen spanec/stres/teža, rednost vpisov, platoji in fokus za naprej.
+Gumb Deli (besedilo), „Podrobno“ odpre Analitiko. Obvestilo v nedeljo 19:00 in zadnji dan v mesecu 19:00,
+na Domov kartica, dokler ga ne odpreš; arhiv za nazaj s puščicami.
 
 ## Platoji (`www/js/plateau.js`)
 Vaja je na platoju, če se je v zadnjih 21 dneh še delala, a od zadnjega napredka (večja delovna teža
