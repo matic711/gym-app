@@ -1,7 +1,7 @@
 const ICONS = {
   home: '<path d="M3.5 10.5 12 3.5l8.5 7V19a1.5 1.5 0 0 1-1.5 1.5h-4.5v-6h-5v6H5A1.5 1.5 0 0 1 3.5 19z"></path>',
   trening: '<path d="M6.5 6.5v11M17.5 6.5v11M3.5 9.5v5M20.5 9.5v5M6.5 12h11"></path>',
-  zdravje: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.2 4.2 0 0 1 12 7.2a4.2 4.2 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"></path>',
+  koledar: '<rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path><path d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01"></path>',
   analitika: '<path d="M5 20v-7M12 20V5M19 20v-11"></path>',
   nastavitve: '<path d="M4 7h9M18 7h2M4 17h4M13 17h7"></path><circle cx="15.5" cy="7" r="2.3"></circle><circle cx="10.5" cy="17" r="2.3"></circle>'
 };
@@ -9,7 +9,7 @@ const ICONS = {
 const ITEMS = [
   { key: 'home', label: 'Domov', route: 'home' },
   { key: 'trening', label: 'Trening', route: 'trening' },
-  { key: 'zdravje', label: 'Počutje', route: 'zdravje' },
+  { key: 'koledar', label: 'Koledar', route: 'koledar' },
   { key: 'analitika', label: 'Analitika', route: 'analitika' },
   { key: 'nastavitve', label: 'Nastavitve', route: 'nastavitve' }
 ];

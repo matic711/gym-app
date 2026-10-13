@@ -1,10 +1,10 @@
-import { searchExercises } from '../exercises.js';
+import { searchExercises, SL_TO_EN } from '../exercises.js';
 import { escapeHtml } from '../util.js';
 
 function customEntryHtml(query) {
   const trimmed = query.trim();
   if (!trimmed) return '';
-  const exists = searchExercises(trimmed).some(g => g.exercises.some(e => e.toLowerCase() === trimmed.toLowerCase()));
+  const exists = SL_TO_EN[trimmed.toLowerCase()] || searchExercises(trimmed).some(g => g.exercises.some(e => e.toLowerCase() === trimmed.toLowerCase()));
   if (exists) return '';
   return `
 <button type="button" data-pick="${escapeHtml(trimmed)}" data-group="" style="width: 100%; text-align: left; min-height: 52px; border: 0; border-radius: 12px; background: var(--accentSoft); color: var(--accentText); padding: 0 14px; margin: 6px 0; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">+ Dodaj vajo po meri: "${escapeHtml(trimmed)}"</button>`;

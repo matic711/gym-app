@@ -219,7 +219,9 @@ Kako se počutiš?
     root.querySelector('[data-action="note"]').addEventListener('change', (e) => { draft.note = e.target.value; persist(); });
     root.querySelector('[data-action="save"]').addEventListener('click', () => {
       persist(true);
-      if (gate) ctx.refresh(); else ctx.navigate('home');
+      if (gate) ctx.refresh();
+      else if (ctx.params.from === 'koledar') ctx.navigate('koledar', { date: isoDate(selectedDate) });
+      else ctx.navigate('home');
     });
   }
 

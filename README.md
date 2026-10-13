@@ -12,7 +12,11 @@ Koda je bila obnovljena iz nameščenega APK-ja (`com.gymapp.mobile`).
 - **nastavitve** – tema, velikost pisave, opomniki, izvoz/uvoz podatkov (JSON)
 - **urediTrening** – urejanje že končanega treninga (klik na trening v zgodovini)
 - **vaja** – statistika posamezne vaje z grafi (najtežji dvig, volumen, ponovitve)
+- **koledar** – mesečni pregled (treningi, vpisi počutja); klik na dan pokaže počutje in treninge tistega dne
 - **forma** – analiza: kako spanec, stres, energija in teža vplivajo na lifte; opozorilo, ko nazaduješ
+
+Imena vaj so v angleščini (knjižnica v `exercises.js`). Starejši podatki s slovenskimi imeni se ob
+prvem zagonu enkrat preimenujejo (`SL_TO_EN`), iskanje vaj pa razume tudi slovenske besede.
 
 ## Jutranji vpis
 Dokler današnji dan ni vpisan (od 4:00 naprej), aplikacija pokaže samo zaslon „Dobro jutro“

@@ -11,13 +11,15 @@ import * as nastavitve from './screens/nastavitve.js';
 import * as urediTrening from './screens/urediTrening.js';
 import * as vaja from './screens/vaja.js';
 import * as forma from './screens/forma.js';
+import * as koledar from './screens/koledar.js';
 
 const SCREENS = {
   home: { mod: domov, tab: 'home' },
   trening: { mod: trening, tab: 'trening' },
   predloge: { mod: predloge, tab: 'trening' },
   nov: { mod: novTrening, tab: null },
-  zdravje: { mod: zdravje, tab: 'zdravje' },
+  zdravje: { mod: zdravje, tab: 'koledar' },
+  koledar: { mod: koledar, tab: 'koledar' },
   analitika: { mod: analitika, tab: 'analitika' },
   nastavitve: { mod: nastavitve, tab: 'nastavitve' },
   uredi: { mod: urediTrening, tab: null },

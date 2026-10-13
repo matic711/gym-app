@@ -15,6 +15,13 @@ export function fmtDateShort(d) { return `${d.getDate()}. ${MONTHS_SHORT[d.getMo
 export function fmtNum(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
 export function fmtNum1(n) { return (Math.round(n * 10) / 10).toFixed(1).replace('.', ','); }
 
+// Slovenian noun forms for 1 / 2 / 3–4 / 5+ (e.g. ['vaja', 'vaji', 'vaje', 'vaj']).
+export function plural(n, forms) {
+  const m = Math.abs(n) % 100;
+  const f = m === 1 ? forms[0] : m === 2 ? forms[1] : m === 3 || m === 4 ? forms[2] : forms[3];
+  return `${n} ${f}`;
+}
+
 export function workoutVolume(w) {
   let v = 0;
   for (const ex of w.exercises) for (const s of ex.sets) {

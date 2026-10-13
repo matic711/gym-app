@@ -84,10 +84,44 @@ export const EXERCISE_LIBRARY = [
   }
 ];
 
+// Slovenian names used by earlier versions of the app → library name and group.
+// Old data is renamed once (state.js migrate) so stats don't split per language.
+export const SL_TO_EN = {
+  'potisk s prsi': ['Bench Press', 'Chest'],
+  'poševni potisk': ['Incline Bench Press', 'Chest'],
+  'potisk nad glavo': ['Overhead Press', 'Shoulders'],
+  'odmiki v stran': ['Lateral Raise', 'Shoulders'],
+  'triceps na škripcu': ['Triceps Pushdown', 'Triceps'],
+  'francoski potisk': ['Skullcrusher', 'Triceps'],
+  'mrtvi dvig': ['Deadlift', 'Back'],
+  'zgibi': ['Pull-ups', 'Back'],
+  'veslanje': ['Barbell Row', 'Back'],
+  'face pull': ['Face Pull', 'Back'],
+  'biceps upogibi': ['Dumbbell Curl', 'Biceps'],
+  'koncentracijski upogibi': ['Concentration Curl', 'Biceps'],
+  'počep': ['Squat', 'Quads'],
+  'romunski mrtvi dvig': ['Romanian Deadlift', 'Hamstrings & Glutes'],
+  'potisk z nogami': ['Leg Press', 'Quads'],
+  'izpadni koraki': ['Lunges', 'Quads'],
+  'meča': ['Standing Calf Raise', 'Calves']
+};
+
+// Extra Slovenian search words, so "počep" or "prsa" still finds the English name.
+const SL_GROUPS = {
+  Chest: 'prsa', Back: 'hrbet', Shoulders: 'rame ramena', Biceps: 'biceps', Triceps: 'triceps',
+  Forearms: 'podlakti', Quads: 'noge kvadriceps', 'Hamstrings & Glutes': 'zadnja stegna zadnjica',
+  Calves: 'meča', Core: 'trebuh core', 'Full Body': 'celo telo', Cardio: 'kardio'
+};
+const SL_ALIASES = {};
+for (const [sl, [en]] of Object.entries(SL_TO_EN)) SL_ALIASES[en] = (SL_ALIASES[en] ? SL_ALIASES[en] + ' ' : '') + sl;
+
 export function searchExercises(query) {
   const q = query.trim().toLowerCase();
   if (!q) return EXERCISE_LIBRARY;
   return EXERCISE_LIBRARY
-    .map(g => ({ group: g.group, exercises: g.exercises.filter(e => e.toLowerCase().includes(q) || g.group.toLowerCase().includes(q)) }))
+    .map(g => {
+      const groupText = (g.group + ' ' + (SL_GROUPS[g.group] || '')).toLowerCase();
+      return { group: g.group, exercises: g.exercises.filter(e => (e + ' ' + (SL_ALIASES[e] || '')).toLowerCase().includes(q) || groupText.includes(q)) };
+    })
     .filter(g => g.exercises.length);
 }

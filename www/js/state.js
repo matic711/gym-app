@@ -1,3 +1,5 @@
+import { SL_TO_EN } from './exercises.js';
+
 const STORAGE_KEY = 'gymapp:v1';
 
 function uid() {
@@ -26,27 +28,27 @@ function seedData() {
 
   const templates = [
     { id: uid(), name: 'Push', summary: 'prsa, rame, triceps', exercises: [
-      { name: 'Potisk s prsi', muscle: 'Prsa · triceps' },
-      { name: 'Poševni potisk', muscle: 'Prsa' },
-      { name: 'Potisk nad glavo', muscle: 'Rame' },
-      { name: 'Odmiki v stran', muscle: 'Rame' },
-      { name: 'Triceps na škripcu', muscle: 'Triceps' },
-      { name: 'Francoski potisk', muscle: 'Triceps' }
+      { name: 'Bench Press', muscle: 'Chest' },
+      { name: 'Incline Bench Press', muscle: 'Chest' },
+      { name: 'Overhead Press', muscle: 'Shoulders' },
+      { name: 'Lateral Raise', muscle: 'Shoulders' },
+      { name: 'Triceps Pushdown', muscle: 'Triceps' },
+      { name: 'Skullcrusher', muscle: 'Triceps' }
     ] },
     { id: uid(), name: 'Pull', summary: 'hrbet, biceps', exercises: [
-      { name: 'Mrtvi dvig', muscle: 'Hrbet · zadnja stegna' },
-      { name: 'Zgibi', muscle: 'Hrbet' },
-      { name: 'Veslanje', muscle: 'Hrbet' },
-      { name: 'Face pull', muscle: 'Zadnje rame' },
-      { name: 'Biceps upogibi', muscle: 'Biceps' },
-      { name: 'Koncentracijski upogibi', muscle: 'Biceps' }
+      { name: 'Deadlift', muscle: 'Back' },
+      { name: 'Pull-ups', muscle: 'Back' },
+      { name: 'Barbell Row', muscle: 'Back' },
+      { name: 'Face Pull', muscle: 'Back' },
+      { name: 'Dumbbell Curl', muscle: 'Biceps' },
+      { name: 'Concentration Curl', muscle: 'Biceps' }
     ] },
     { id: uid(), name: 'Noge', summary: 'noge, zadnjica', exercises: [
-      { name: 'Počep', muscle: 'Kvadriceps · zadnjica' },
-      { name: 'Romunski mrtvi dvig', muscle: 'Zadnja stegna' },
-      { name: 'Potisk z nogami', muscle: 'Kvadriceps' },
-      { name: 'Izpadni koraki', muscle: 'Zadnjica · noge' },
-      { name: 'Meča', muscle: 'Meča' }
+      { name: 'Squat', muscle: 'Quads' },
+      { name: 'Romanian Deadlift', muscle: 'Hamstrings & Glutes' },
+      { name: 'Leg Press', muscle: 'Quads' },
+      { name: 'Lunges', muscle: 'Quads' },
+      { name: 'Standing Calf Raise', muscle: 'Calves' }
     ] }
   ];
 
@@ -58,41 +60,41 @@ function seedData() {
 
   const workouts = [
     { offset: -8, name: 'Noge', min: 61, exercises: [
-      { name: 'Počep', muscle: 'Kvadriceps · zadnjica', sets: mkSets(100, 5) },
-      { name: 'Romunski mrtvi dvig', muscle: 'Zadnja stegna', sets: mkSets(80, 4) },
-      { name: 'Potisk z nogami', muscle: 'Kvadriceps', sets: mkSets(140, 4) },
-      { name: 'Izpadni koraki', muscle: 'Zadnjica · noge', sets: mkSets(20, 3) },
-      { name: 'Meča', muscle: 'Meča', sets: mkSets(60, 4) }
+      { name: 'Squat', muscle: 'Quads', sets: mkSets(100, 5) },
+      { name: 'Romanian Deadlift', muscle: 'Hamstrings & Glutes', sets: mkSets(80, 4) },
+      { name: 'Leg Press', muscle: 'Quads', sets: mkSets(140, 4) },
+      { name: 'Lunges', muscle: 'Quads', sets: mkSets(20, 3) },
+      { name: 'Standing Calf Raise', muscle: 'Calves', sets: mkSets(60, 4) }
     ] },
     { offset: -6, name: 'Full body', min: 47, exercises: [
-      { name: 'Počep', muscle: 'Kvadriceps · zadnjica', sets: mkSets(90, 3) },
-      { name: 'Potisk s prsi', muscle: 'Prsa · triceps', sets: mkSets(60, 4) },
-      { name: 'Veslanje', muscle: 'Hrbet', sets: mkSets(55, 3) },
-      { name: 'Potisk nad glavo', muscle: 'Rame', sets: mkSets(35, 3) },
-      { name: 'Biceps upogibi', muscle: 'Biceps', sets: mkSets(15, 3) }
+      { name: 'Squat', muscle: 'Quads', sets: mkSets(90, 3) },
+      { name: 'Bench Press', muscle: 'Chest', sets: mkSets(60, 4) },
+      { name: 'Barbell Row', muscle: 'Back', sets: mkSets(55, 3) },
+      { name: 'Overhead Press', muscle: 'Shoulders', sets: mkSets(35, 3) },
+      { name: 'Dumbbell Curl', muscle: 'Biceps', sets: mkSets(15, 3) }
     ] },
     { offset: -3, name: 'Push · prsa, rame, triceps', min: 55, exercises: [
-      { name: 'Potisk s prsi', muscle: 'Prsa · triceps', sets: mkSets(62.5, 4) },
-      { name: 'Poševni potisk', muscle: 'Prsa', sets: mkSets(50, 3) },
-      { name: 'Potisk nad glavo', muscle: 'Rame', sets: mkSets(40, 3) },
-      { name: 'Odmiki v stran', muscle: 'Rame', sets: mkSets(12, 3) },
-      { name: 'Triceps na škripcu', muscle: 'Triceps', sets: mkSets(25, 3) },
-      { name: 'Francoski potisk', muscle: 'Triceps', sets: mkSets(20, 3) }
+      { name: 'Bench Press', muscle: 'Chest', sets: mkSets(62.5, 4) },
+      { name: 'Incline Bench Press', muscle: 'Chest', sets: mkSets(50, 3) },
+      { name: 'Overhead Press', muscle: 'Shoulders', sets: mkSets(40, 3) },
+      { name: 'Lateral Raise', muscle: 'Shoulders', sets: mkSets(12, 3) },
+      { name: 'Triceps Pushdown', muscle: 'Triceps', sets: mkSets(25, 3) },
+      { name: 'Skullcrusher', muscle: 'Triceps', sets: mkSets(20, 3) }
     ] },
     { offset: -2, name: 'Pull · hrbet, biceps', min: 52, exercises: [
-      { name: 'Mrtvi dvig', muscle: 'Hrbet · zadnja stegna', sets: mkSets(120, 3) },
-      { name: 'Zgibi', muscle: 'Hrbet', sets: mkSets(0, 4) },
-      { name: 'Veslanje', muscle: 'Hrbet', sets: mkSets(57.5, 4) },
-      { name: 'Face pull', muscle: 'Zadnje rame', sets: mkSets(20, 3) },
-      { name: 'Biceps upogibi', muscle: 'Biceps', sets: mkSets(16, 3) },
-      { name: 'Koncentracijski upogibi', muscle: 'Biceps', sets: mkSets(10, 3) }
+      { name: 'Deadlift', muscle: 'Back', sets: mkSets(120, 3) },
+      { name: 'Pull-ups', muscle: 'Back', sets: mkSets(0, 4) },
+      { name: 'Barbell Row', muscle: 'Back', sets: mkSets(57.5, 4) },
+      { name: 'Face Pull', muscle: 'Back', sets: mkSets(20, 3) },
+      { name: 'Dumbbell Curl', muscle: 'Biceps', sets: mkSets(16, 3) },
+      { name: 'Concentration Curl', muscle: 'Biceps', sets: mkSets(10, 3) }
     ] },
     { offset: -1, name: 'Noge', min: 58, exercises: [
-      { name: 'Počep', muscle: 'Kvadriceps · zadnjica', sets: mkSets(120, 5) },
-      { name: 'Romunski mrtvi dvig', muscle: 'Zadnja stegna', sets: mkSets(85, 4) },
-      { name: 'Potisk z nogami', muscle: 'Kvadriceps', sets: mkSets(150, 4) },
-      { name: 'Izpadni koraki', muscle: 'Zadnjica · noge', sets: mkSets(22, 3) },
-      { name: 'Meča', muscle: 'Meča', sets: mkSets(65, 4) }
+      { name: 'Squat', muscle: 'Quads', sets: mkSets(120, 5) },
+      { name: 'Romanian Deadlift', muscle: 'Hamstrings & Glutes', sets: mkSets(85, 4) },
+      { name: 'Leg Press', muscle: 'Quads', sets: mkSets(150, 4) },
+      { name: 'Lunges', muscle: 'Quads', sets: mkSets(22, 3) },
+      { name: 'Standing Calf Raise', muscle: 'Calves', sets: mkSets(65, 4) }
     ] }
   ].map(w => {
     const date = addDays(today, w.offset);
@@ -127,7 +129,8 @@ function seedData() {
     templates,
     workouts,
     wellness,
-    activeWorkout: null
+    activeWorkout: null,
+    meta: { englishExerciseNames: true }
   };
 }
 
@@ -171,6 +174,17 @@ function emptyData() {
 function migrate(data) {
   const def = defaultSettings();
   data.settings = { ...def, ...data.settings, toggles: { ...def.toggles, ...(data.settings && data.settings.toggles) } };
+  data.meta = data.meta || {};
+  if (!data.meta.englishExerciseNames) {
+    const rename = ex => {
+      const hit = SL_TO_EN[String(ex.name || '').trim().toLowerCase()];
+      if (hit) { ex.name = hit[0]; ex.muscle = hit[1]; }
+    };
+    for (const w of data.workouts || []) (w.exercises || []).forEach(rename);
+    for (const t of data.templates || []) (t.exercises || []).forEach(rename);
+    if (data.activeWorkout) (data.activeWorkout.exercises || []).forEach(rename);
+    data.meta.englishExerciseNames = true;
+  }
   return data;
 }
 
@@ -180,10 +194,15 @@ class Store {
     this.listeners = new Set();
   }
   load() {
+    let parsed = null;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return migrate(JSON.parse(raw));
+      if (raw) parsed = JSON.parse(raw);
     } catch (e) { /* corrupt storage, fall through to reseed */ }
+    if (parsed) {
+      // A failed migration must never fall through to reseeding real data.
+      try { return migrate(parsed); } catch (e) { console.warn('Migracija ni uspela:', e); return parsed; }
+    }
     const seeded = seedData();
     this.persist(seeded);
     return seeded;
