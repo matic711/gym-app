@@ -2,6 +2,8 @@ import { store } from '../state.js';
 import { fromIso, fmtDateShort, fmtNum1 } from '../util.js';
 import { formReport, pct, hm } from '../analysis.js';
 import { lineChartHtml } from '../components/lineChart.js';
+import { detectPlateaus } from '../plateau.js';
+import { escapeHtml } from '../util.js';
 
 const LEVEL_STYLE = {
   bad: { color: 'var(--danger)', icon: '<path d="M12 8v5M12 16.5h.01"></path><circle cx="12" cy="12" r="9"></circle>' },
@@ -113,6 +115,18 @@ ${lineChartHtml(points, { fmt: v => `${v >= 0 ? '+' : '−'}${Math.abs(Math.roun
 <div style="font-size: 13px; color: var(--text2); padding-bottom: 4px">Iz jutranjih vpisov na dneve treningov</div>
 ${rep.factors.map(factorHtml).join('')}
 </section>
+
+${(() => {
+  const list = detectPlateaus(store.data);
+  return `<section style="background: var(--card); border-radius: 22px; padding: 14px 18px 6px; display: flex; flex-direction: column; box-shadow: var(--shadow)">
+<h2 style="margin: 0 0 2px; font-size: 15px; font-weight: 600">Platoji</h2>
+<div style="font-size: 13px; color: var(--text2); padding-bottom: 4px">Vaje brez napredka vsaj ${store.data.settings.plateauWeeks || 4} tedne</div>
+${list.length ? list.map((x, i) => `<a href="#/vaja?name=${encodeURIComponent(x.name)}" style="padding: 10px 0; display: flex; justify-content: space-between; gap: 8px; text-decoration: none; color: var(--text); ${i ? 'border-top: 1px solid var(--line);' : ''}">
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 15px; font-weight: 600">${escapeHtml(x.name)}</span><span style="font-size: 12px; color: var(--text2)">Najboljše ${x.best} · ${x.sessions} treningov brez napredka</span></span>
+<span style="font-size: 13px; font-weight: 700; flex-shrink: 0; color: ${x.cut ? 'var(--accentText)' : x.long ? 'var(--danger)' : 'var(--mood)'}">${x.weeks} t.${x.cut ? ' · cut' : ''}</span>
+</a>`).join('') : '<div style="font-size: 14px; color: var(--good); padding: 6px 0 10px">Nobena vaja ne stoji. 👍</div>'}
+</section>`;
+})()}
 
 <details style="background: var(--card); border-radius: 22px; padding: 14px 18px; box-shadow: var(--shadow); font-size: 14px; color: var(--text2)">
 <summary style="font-size: 15px; font-weight: 600; color: var(--text); cursor: pointer">Kako se računa</summary>

@@ -3,6 +3,7 @@ import { fromIso, fmtDate, fmtDateShort, fmtNum, fmtNum1, escapeHtml } from '../
 import { exerciseHistory } from '../stats.js';
 import { lineChartHtml } from '../components/lineChart.js';
 import { recommend, ruleFor, setRule } from '../progression.js';
+import { plateauFor } from '../plateau.js';
 
 function progressionHtml(name) {
   const rule = ruleFor(store.data, name);
@@ -155,6 +156,23 @@ ${lineChartHtml(vm.points, { color: vm.metric.color, fmt: vm.metric.fmt })}
 ${segHtml(RANGES, rangeIdx, 'range')}
 </div>
 </section>
+
+${(() => {
+  const pl = plateauFor(store.data, vm.name);
+  if (!pl) return '';
+  const color = pl.cut ? 'var(--accentText)' : pl.long ? 'var(--danger)' : 'var(--mood)';
+  return `<section style="background: var(--card); border-radius: 22px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow); border-left: 4px solid ${color}">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600; color: ${color}">${pl.cut ? 'Moč drži med cutom' : pl.long ? 'Dolgotrajen plato' : 'Plato'}</h2>
+<span style="font-size: 12px; color: var(--text2)">${pl.weeks} ${pl.weeks === 1 ? 'teden' : pl.weeks === 2 ? 'tedna' : pl.weeks <= 4 ? 'tedne' : 'tednov'} · ${pl.sessions} treningov</span>
+</div>
+<div style="font-size: 14px">Najboljše: ${pl.best}, od takrat brez napredka.</div>
+<div style="font-size: 13px; font-weight: 600; color: var(--text2); padding-top: 2px">${pl.cut ? '' : 'Kaj poskusiti'}</div>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px">
+${pl.tips.map(t => `<li>${escapeHtml(t.text)}</li>`).join('')}
+</ul>
+</section>`;
+})()}
 
 ${progressionHtml(vm.name)}
 

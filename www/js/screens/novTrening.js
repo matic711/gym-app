@@ -2,6 +2,7 @@ import { store, uid, isoDate } from '../state.js';
 import { fmtNum } from '../util.js';
 import { openExercisePicker } from '../components/exercisePicker.js';
 import { recommend } from '../progression.js';
+import { plateauFor } from '../plateau.js';
 
 const REC_COLORS = { up: 'var(--good)', reps: 'var(--accentText)', hold: 'var(--mood)', deload: 'var(--danger)' };
 const REC_ICONS = { up: '↑', reps: '+1', hold: '=', deload: '↓' };
@@ -59,6 +60,7 @@ function computeVals(data) {
 
   const exercises = w.exercises.map((ex, ei) => {
     const rec = recommend(data, ex.name);
+    const plateau = rec ? plateauFor(data, ex.name) : null;
     const rows = ex.sets.map((s, si) => {
       setCount++;
       const kgNum = parseFloat(String(s.kg).replace(',', '.')) || 0;
@@ -83,14 +85,14 @@ function computeVals(data) {
         rows[i].restBefore = formatRestMs(curSet.doneAt - prevSet.doneAt);
       }
     }
-    return { ex, ei, rows, rec };
+    return { ex, ei, rows, rec, plateau };
   });
 
   return { exercises, volume: fmtNum(volume), doneCount, setCount };
 }
 
 function template(w, vm, restLabel) {
-  const exercisesHtml = vm.exercises.map(({ ex, ei, rows, rec }) => `
+  const exercisesHtml = vm.exercises.map(({ ex, ei, rows, rec, plateau }) => `
 <section style="background: var(--card); border-radius: 22px; padding: 16px 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow)">
 <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px">
 <div style="display: flex; flex-direction: column; gap: 2px">
@@ -108,6 +110,7 @@ ${rec ? `
 <div style="font-size: 12px; color: var(--text2)">${rec.reason}</div>
 <div style="font-size: 12px; color: var(--text2)">${rec.note ? 'Osnova' : 'Zadnjič'}: ${rec.last}</div>
 ${rec.note ? `<div style="font-size: 12px; color: var(--mood)">${rec.note}</div>` : ''}
+${plateau && !plateau.cut ? `<a href="#/vaja?name=${encodeURIComponent(ex.name)}" style="font-size: 12px; font-weight: 600; color: var(--mood); text-decoration: none">Plato ${plateau.weeks} t. — poglej predloge →</a>` : ''}
 </div>
 <button type="button" data-action="applyRec" data-ei="${ei}" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--accent); color: var(--onAccent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0">Uporabi</button>
 </div>` : ''}

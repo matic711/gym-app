@@ -12,6 +12,7 @@ import * as urediTrening from './screens/urediTrening.js';
 import * as vaja from './screens/vaja.js';
 import * as forma from './screens/forma.js';
 import * as koledar from './screens/koledar.js';
+import * as porocilo from './screens/porocilo.js';
 
 const SCREENS = {
   home: { mod: domov, tab: 'home' },
@@ -20,6 +21,7 @@ const SCREENS = {
   nov: { mod: novTrening, tab: null },
   zdravje: { mod: zdravje, tab: 'koledar' },
   koledar: { mod: koledar, tab: 'koledar' },
+  porocilo: { mod: porocilo, tab: 'analitika' },
   analitika: { mod: analitika, tab: 'analitika' },
   nastavitve: { mod: nastavitve, tab: 'nastavitve' },
   uredi: { mod: urediTrening, tab: null },

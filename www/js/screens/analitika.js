@@ -2,6 +2,7 @@ import { store } from '../state.js';
 import { isoDate, addDays, fromIso, fmtDateShort, workoutVolume, fmtNum, fmtNum1, escapeHtml } from '../util.js';
 import { allExercises } from '../stats.js';
 import { formReport } from '../analysis.js';
+import { detectPlateaus } from '../plateau.js';
 
 const RANGES = [
   { label: 'Teden', days: 7 },
@@ -159,11 +160,15 @@ function computeViewModel(rangeIdx) {
       const top = rep.items.find(i => i.level !== 'info') || rep.items[0];
       return top ? { ...top, slacking: rep.slacking } : null;
     })(),
-    exercises: allExercises(data).map(e => ({
+    exercises: (() => {
+      const plateaus = new Map(detectPlateaus(data, today).map(x => [x.name.toLowerCase(), x]));
+      return allExercises(data).map(e => ({
+      plateau: plateaus.get(e.name.toLowerCase()) || null,
       name: e.name,
       meta: `${e.count}× · zadnjič ${fmtDateShort(fromIso(e.lastISO))}`,
       best: e.bestKg ? `${fmtNum1(e.bestKg).replace(/,0$/, '')} kg` : '—'
-    })),
+    }));
+    })(),
     fromLabel: fmtDateShort(start), toLabel: fmtDateShort(today), midLabel: fmtDateShort(addDays(start, Math.round(rangeDays / 2)))
   };
 }
@@ -176,7 +181,7 @@ function exercisesHtml(vm, showAll) {
   return list.map((e, i) => `
 <a href="#/vaja?name=${encodeURIComponent(e.name)}" style="display: flex; align-items: center; gap: 12px; padding: 12px 0; text-decoration: none; color: var(--text); ${i ? 'border-top: 1px solid var(--line);' : ''}">
 <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0">
-<span style="font-size: 15px; font-weight: 600">${escapeHtml(e.name)}</span>
+<span style="font-size: 15px; font-weight: 600">${escapeHtml(e.name)}${e.plateau ? ` <span style="padding: 1px 7px; border-radius: 999px; background: var(--fill); color: ${e.plateau.cut ? 'var(--accentText)' : 'var(--mood)'}; font-size: 11px; font-weight: 700; vertical-align: 2px">plato ${e.plateau.weeks} t.</span>` : ''}</span>
 <span style="font-size: 12px; color: var(--text2)">${e.meta}</span>
 </div>
 <div style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0">
@@ -221,6 +226,14 @@ ${rangesHtml}
 </div>
 
 ${vm.form ? `
+<a href="#/porocilo?kind=week" style="background: var(--card); border-radius: 22px; padding: 16px 18px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); box-shadow: var(--shadow)">
+<div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0">
+<div style="font-size: 15px; font-weight: 600; color: var(--accentText)">Poročila</div>
+<div style="font-size: 13px; color: var(--text2)">Tedensko in mesečno: rekordi, napredek, platoji, fokus</div>
+</div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--text2); flex-shrink: 0"><path d="M9 6l6 6-6 6"></path></svg>
+</a>
+
 <a href="#/forma" style="background: var(--card); border-radius: 22px; padding: 16px 18px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); box-shadow: var(--shadow)">
 <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0">
 <div style="font-size: 15px; font-weight: 600; color: var(--accentText)">Forma in vplivi</div>

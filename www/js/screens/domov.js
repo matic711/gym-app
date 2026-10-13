@@ -1,6 +1,7 @@
 import { store } from '../state.js';
 import { computeReminders, logStreak } from '../reminders.js';
 import { formReport } from '../analysis.js';
+import { pendingReport } from '../reports.js';
 import { isoDate, addDays, startOfWeek, fromIso, fmtWeekday, fmtDate, fmtNum, fmtNum1, workoutVolume, workoutSetCount } from '../util.js';
 
 const MOOD_LABELS = ['Slabo', 'Meh', 'V redu', 'Dobro', 'Odlično'];
@@ -104,6 +105,7 @@ function computeViewModel() {
     volume: fmtNum(weekVolume),
     volumeMeta: `Ta teden · ${done} ${treningWord(done)}`,
     reminders: computeReminders(data, today),
+    report: pendingReport(data, today),
     formWarning: (() => {
       const rep = formReport(data, today);
       if (!rep.slacking) return null;
@@ -182,6 +184,16 @@ ${streakHtml}
 </header>
 
 ${remindersHtml}
+
+${vm.report ? `
+<a href="#/porocilo?kind=${vm.report.kind}&date=${vm.report.startIso}" style="background: var(--accent); color: var(--onAccent); border-radius: 22px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; text-decoration: none; box-shadow: var(--shadow)">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M5 20V10M12 20V4M19 20v-7"></path></svg>
+<div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0">
+<div style="font-size: 15px; font-weight: 700">${vm.report.kind === 'month' ? 'Mesečno' : 'Tedensko'} poročilo je pripravljeno</div>
+<div style="font-size: 13px; opacity: 0.85">${vm.report.label}</div>
+</div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M9 6l6 6-6 6"></path></svg>
+</a>` : ''}
 
 ${vm.formWarning ? `
 <a href="#/forma" style="background: var(--card); border-radius: 22px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; text-decoration: none; color: var(--text); box-shadow: var(--shadow); border-left: 4px solid var(--danger)">

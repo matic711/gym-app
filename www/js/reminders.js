@@ -6,7 +6,8 @@ const DAY_MS = 86400000;
 
 export const REMIND_TIMES = {
   training: { h: 18, m: 0 },
-  evening: { h: 21, m: 0 }
+  evening: { h: 21, m: 0 },
+  report: { h: 19, m: 0 }
 };
 
 export function morningTime(settings) {

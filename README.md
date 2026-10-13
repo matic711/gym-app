@@ -31,6 +31,18 @@ Privzeto: compound 6–8 pon. (noge +5 kg, ostalo +2,5 kg), izolacija in kabli 1
 lastna teža 6–12 pon. nato +2,5 kg uteži; core/kardio brez predlogov. Za vsako vajo se nastavi
 na zaslonu vaje (Napredovanje). Med treningom ✓ na prazni seriji prevzame predlagane vrednosti.
 
+## Poročila (`www/js/reports.js`, zaslon `porocilo`)
+Tedensko (nedelja 19:00) in mesečno (zadnji dan v mesecu 19:00) poročilo z obvestilom; na Domov
+kartica, dokler ga ne odpreš. Vsebina: treningi glede na cilj, volumen (obdobje v teku se primerja z
+enakim številom dni prejšnjega), rekordi, napredek vaj, platoji, forma, počutje, fokus za naprej.
+Mesečno še glavni dvigi. Računa se sproti iz podatkov, zato je dostopen arhiv za nazaj.
+
+## Platoji (`www/js/plateau.js`)
+Vaja je na platoju, če se je v zadnjih 21 dneh še delala, a od zadnjega napredka (večja delovna teža
+ali več ponovitev pri najboljši teži) minejo vsaj N tednov (privzeto 4) in vsaj 4 treningi.
+Če je telesna teža v tem času padla za 2 % ali več, je označeno kot cut (moč drži). Predlogi: spanec/stres,
+deload, sprememba razpona, dodatna serija, varianta vaje.
+
 ## Jutranji vpis
 Dokler današnji dan ni vpisan (od 4:00 naprej), aplikacija pokaže samo zaslon „Dobro jutro“
 (izklopiš v Nastavitve → Opomniki → Zakleni aplikacijo do vpisa). Obvestilo pride ob nastavljeni uri

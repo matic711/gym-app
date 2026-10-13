@@ -54,7 +54,7 @@ export function setRule(data, name, patch) {
   data.settings.progression[key] = { ...(data.settings.progression[key] || {}), ...patch };
 }
 
-function workingSets(session) {
+export function workingSets(session) {
   const sets = session.sets.map(s => ({ kg: Number(s.kg) || 0, reps: Number(s.reps) || 0 })).filter(s => s.reps > 0);
   const top = Math.max(0, ...sets.map(s => s.kg));
   return { top, sets: sets.filter(s => s.kg === top) };

@@ -146,12 +146,14 @@ function defaultSettings() {
     goalWeightKg: 76.0,
     defaultRestSec: 90,
     morningTime: '07:30',
+    plateauWeeks: 4,
     firstDayMonday: true,
     toggles: {
       sound: true, vibe: true, prevValues: true,
       trackWeight: true, trackSleep: true, trackMood: true, trackEnergy: true, trackStress: true, trackWaist: false,
       remindMood: true, remindWeigh: false, remindTraining: true,
       remindMorning: true, morningGate: true,
+      reportWeekly: true, reportMonthly: true,
       autoBackup: true
     },
     lastBackupAt: null

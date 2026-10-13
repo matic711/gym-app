@@ -157,6 +157,12 @@ ${switchRow('Obseg pasu', 'Tedenski vpis · ' + (s.heightUnit === 'cm' ? 'cm' : 
 ${switchRow('Jutranji vpis', 'Obvestilo vsako jutro, ponavlja se do vpisa', t.remindMorning, 'remindMorning', false)}
 ${switchRow('Zakleni aplikacijo do vpisa', 'Brez jutranjega vpisa ne moreš naprej', t.morningGate, 'morningGate', false)}
 ${switchRow('Trening', 'Ob ' + (s.clock === '24 h' ? '18:00' : '6:00 PM') + ', ko zaostajaš za tedenskim ciljem', t.remindTraining, 'remindTraining', false)}
+${switchRow('Tedensko poročilo', 'Nedelja ob ' + (s.clock === '24 h' ? '19:00' : '7:00 PM'), t.reportWeekly, 'reportWeekly', false)}
+${switchRow('Mesečno poročilo', 'Zadnji dan v mesecu ob ' + (s.clock === '24 h' ? '19:00' : '7:00 PM'), t.reportMonthly, 'reportMonthly', false)}
+<button type="button" data-action="editPlateau" style="width: 100%; min-height: 52px; border: 0; border-top: 1px solid var(--line); background: transparent; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font: inherit; color: var(--text); cursor: pointer">
+<span style="font-size: 16px">Plato po</span>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text2)">${s.plateauWeeks || 4} tednih brez napredka<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></span>
+</button>
 </section>
 
 <h2 style="margin: 18px 16px 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text2)">Podatki in varnostna kopija</h2>
@@ -311,6 +317,11 @@ export function mount(root, ctx) {
     });
     root.querySelector('[data-action="goalUp"]').addEventListener('click', () => {
       setSetting({ goalPerWeek: Math.min(7, store.data.settings.goalPerWeek + 1) });
+    });
+    root.querySelector('[data-action="editPlateau"]').addEventListener('click', () => {
+      const val = prompt('Plato po koliko tednih brez napredka? (2–16)', String(store.data.settings.plateauWeeks || 4));
+      const n = parseInt(val, 10);
+      if (n >= 2 && n <= 16) setSetting({ plateauWeeks: n });
     });
     root.querySelector('[data-action="editMorning"]').addEventListener('click', () => {
       const val = prompt('Ura jutranjega vpisa (npr. 07:30):', store.data.settings.morningTime || '07:30');
