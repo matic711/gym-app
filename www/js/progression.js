@@ -3,7 +3,7 @@
 // working set reaches the top of the range, add weight and start again at the
 // bottom. No program needed — only the exercise's own history.
 import { EXERCISE_LIBRARY } from './exercises.js';
-import { exerciseHistory } from './stats.js';
+import { exerciseHistory, allExercises } from './stats.js';
 import { isoDate, fromIso, fmtDateShort } from './util.js';
 import { sleepMinutes } from './analysis.js';
 
@@ -43,9 +43,65 @@ export function defaultRule(name) {
 
 export function ruleFor(data, name) {
   const custom = ((data.settings.progression || {})[name.trim().toLowerCase()]) || {};
-  const rule = { ...defaultRule(name), ...custom };
+  const rule = { ...defaultRule(name), ...custom, customRange: custom.min != null && custom.max != null && !custom.inferred, rangeLocked: !!custom.rangeLocked || (custom.min != null && custom.max != null) };
   if (custom.off === false && rule.kind === 'off') rule.kind = 'isolation';
   return { ...rule, label: rule.off ? KIND_LABEL.off : KIND_LABEL[rule.kind] };
+}
+
+const RANGE_PRESETS = {
+  compound: [[3, 5], [4, 6], [6, 8], [8, 10], [10, 12], [12, 15]],
+  isolation: [[6, 10], [8, 12], [10, 15], [12, 20], [15, 25]],
+  bodyweight: [[3, 6], [6, 12], [10, 15], [12, 20], [15, 25]]
+};
+
+function median(xs) {
+  const a = [...xs].sort((x, y) => x - y), m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+// Reps the lifter usually does on the first working set (last 8 sessions).
+function typicalReps(hist) {
+  const firsts = hist.slice(-8).map(h => workingSets(h).sets[0]).filter(Boolean).map(s => s.reps);
+  return firsts.length ? median(firsts) : null;
+}
+
+// The default range only fits if the lifter actually trains in it. Someone who
+// squats 3×5 or benches 3×10 gets a range around their own reps instead
+// (unless they set one themselves on the exercise screen).
+function withInferredRange(rule, hist) {
+  if (rule.off || rule.rangeLocked || hist.length < 2) return rule;
+  const t = typicalReps(hist);
+  if (t == null || (t >= rule.min && t <= rule.max)) return rule;
+  const presets = RANGE_PRESETS[rule.kind === 'lower' || rule.kind === 'upper' ? 'compound' : rule.kind === 'bodyweight' ? 'bodyweight' : 'isolation'];
+  let best = null;
+  for (const [mn, mx] of presets) {
+    if (t >= mn && t <= mx && (!best || t - mn < t - best[0])) best = [mn, mx];
+  }
+  if (!best) best = t < presets[0][0] ? presets[0] : presets[presets.length - 1];
+  return { ...rule, min: best[0], max: best[1], inferred: true };
+}
+
+// The rule actually used for an exercise, including a range inferred from history.
+export function effectiveRule(data, name) {
+  return withInferredRange(ruleFor(data, name), exerciseHistory(data, name));
+}
+
+// Fix the inferred range once an exercise has a few sessions, so it reflects
+// the lifter's own habit and doesn't drift with the app's own suggestions.
+// Runs on load and when a workout is finished; returns true if anything changed.
+const LOCK_AFTER = 3;
+export function lockRanges(data) {
+  let changed = false;
+  for (const e of allExercises(data)) {
+    const rule = ruleFor(data, e.name);
+    if (rule.off || rule.rangeLocked) continue;
+    const hist = exerciseHistory(data, e.name);
+    if (hist.length < LOCK_AFTER) continue;
+    const r = withInferredRange(rule, hist);
+    setRule(data, e.name, r.inferred ? { min: r.min, max: r.max, inferred: true } : { rangeLocked: true });
+    changed = true;
+  }
+  return changed;
 }
 
 export function setRule(data, name, patch) {
@@ -78,11 +134,12 @@ function poorReadiness(data, now) {
 // Suggestion for today, or null when there is nothing to base it on.
 // { type: 'up' | 'reps' | 'hold' | 'deload' | 'first', kg, reps: [per working set], sets, title, reason, rule }
 export function recommend(data, name, now = new Date()) {
-  const rule = ruleFor(data, name);
-  if (rule.off) return null;
+  const base0 = ruleFor(data, name);
+  if (base0.off) return null;
   const todayIso = isoDate(now);
   const hist = exerciseHistory(data, name).filter(h => h.dateISO <= todayIso);
   if (!hist.length) return null;
+  const rule = withInferredRange(base0, hist);
 
   // A lighter-than-usual session (a bad day) shouldn't reset the baseline: when
   // the last working weight is at least 5 % under the session before it, suggest
@@ -104,42 +161,86 @@ export function recommend(data, name, now = new Date()) {
   return suggestFrom(data, hist, rule, now);
 }
 
+function floorTo(x, step) { return Math.floor(x / step + 1e-9) * step; }
+
+// Set-by-set plan following the order of the last session: working sets get
+// the suggestion, warm-up and back-off sets keep their reps and move with the
+// working weight.
+function planFrom(session, top, workKg, targets) {
+  let w = 0;
+  return session.sets
+    .map(s => ({ kg: Number(s.kg) || 0, reps: Number(s.reps) || 0 }))
+    .filter(s => s.reps > 0)
+    .map(s => {
+      if (s.kg === top) return { kg: workKg, reps: targets[Math.min(w++, targets.length - 1)], working: true };
+      let kg = s.kg;
+      if (top && kg && workKg !== top) kg = Math.min(workKg, Math.round(kg * workKg / top / 2.5) * 2.5) || s.kg;
+      return { kg, reps: s.reps, working: false };
+    });
+}
+
 function suggestFrom(data, hist, rule, now) {
-  const last = workingSets(hist[hist.length - 1]);
+  const session = hist[hist.length - 1];
+  const last = workingSets(session);
   if (!last.sets.length) return null;
   const reps = last.sets.map(s => s.reps);
-  const n = last.sets.length;
+  const n = reps.length;
+  const total = reps.reduce((a, b) => a + b, 0);
   const lastText = `${last.top ? fmt(last.top) + ' kg' : 'lastna teža'} × ${reps.join(', ')}`;
   const range = `${rule.min}–${rule.max}`;
-  const allTop = reps.every(r => r >= rule.max);
-  const below = reps.some(r => r < rule.min);
+  const kgLabel = kg => (kg ? fmt(kg) + ' kg' : 'lastna teža');
+  const result = (type, kg, targets, title, reason) => {
+    const plan = planFrom(session, last.top, kg, targets);
+    return { type, kg, reps: targets, sets: n, plan, rule, title, reason, last: lastText };
+  };
 
-  // Two sessions in a row under the range at the same weight → back off.
+  // When the next weight step is big for this weight (light dumbbells, cables),
+  // build more reps first so the jump doesn't crash the reps below the range.
+  let topReps = rule.max, bridge = false;
+  if (last.top > 0) {
+    const next = last.top + rule.step;
+    const need = Math.ceil(30 * ((next * (1 + (rule.min - 1) / 30)) / last.top - 1));
+    if (need > rule.max) { topReps = Math.min(need, Math.round(rule.max * 1.6)); bridge = true; }
+  }
+  // All working sets at the top — allowing the last one to be a rep short.
+  const atTop = reps.every(r => r >= topReps) || (n >= 3 && reps[0] >= topReps && total >= n * topReps - 1);
+  const isBelow = rs => rs.length > 0 && (rs[0] < rule.min || rs.reduce((a, b) => a + b, 0) / rs.length < rule.min - 1);
+  const below = isBelow(reps);
+
+  // Two sessions in a row under the range at the same weight, without
+  // improving → back off by about 10 % (always at least one step).
   if (below && hist.length >= 2 && last.top > 0) {
     const prev = workingSets(hist[hist.length - 2]);
-    if (prev.top === last.top && prev.sets.some(s => s.reps < rule.min)) {
-      const kg = roundTo(last.top * 0.9, rule.step);
-      return { type: 'deload', kg, reps: Array(n).fill(rule.max), sets: n, rule, title: `${fmt(kg)} kg × ${rule.max}`,
-        reason: `Dvakrat zapored pod ${rule.min} ponovitev pri ${fmt(last.top)} kg — zmanjšaj za ~10 % in gradi nazaj.`, last: lastText };
+    const prevTotal = prev.sets.reduce((a, s) => a + s.reps, 0);
+    if (prev.top === last.top && isBelow(prev.sets.map(s => s.reps)) && total <= prevTotal) {
+      let kg = floorTo(last.top * 0.9, rule.step);
+      if (kg >= last.top) kg = last.top - rule.step;
+      if (kg > 0) {
+        return result('deload', kg, Array(n).fill(rule.max), `${fmt(kg)} kg × ${rule.max}`,
+          `Dvakrat zapored pod ${rule.min} ponovitev pri ${fmt(last.top)} kg brez napredka — zmanjšaj na ${fmt(kg)} kg in gradi nazaj.`);
+      }
     }
   }
 
-  if (allTop) {
+  if (atTop) {
     const readiness = poorReadiness(data, now);
     if (readiness) {
-      return { type: 'hold', kg: last.top, reps: Array(n).fill(rule.max), sets: n, rule, title: `${last.top ? fmt(last.top) + ' kg' : 'lastna teža'} × ${rule.max}`,
-        reason: `Zadnjič vse na vrhu razpona ${range}, a danes ${readiness} — drži težo, dvigni naslednjič.`, last: lastText };
+      return result('hold', last.top, Array(n).fill(rule.max), `${kgLabel(last.top)} × ${rule.max}`,
+        `Zadnjič na vrhu razpona ${range}, a danes ${readiness} — drži težo, dvigni naslednjič.`);
     }
     const kg = last.top + rule.step;
-    return { type: 'up', kg, reps: Array(n).fill(rule.min), sets: n, rule, title: `${last.top ? '' : '+'}${fmt(kg)} kg${last.top ? '' : ' uteži'} × ${rule.min}–${rule.max}`,
-      reason: last.top
-        ? `Zadnjič vse serije na vrhu razpona ${range} — dodaj ${fmt(rule.step)} kg.`
-        : `Zadnjič vse serije na ${rule.max}+ — čas je za dodatno utež (${fmt(rule.step)} kg).`, last: lastText };
+    return result('up', kg, Array(n).fill(rule.min), `${last.top ? '' : '+'}${fmt(kg)} kg${last.top ? '' : ' uteži'} × ${rule.min}–${rule.max}`,
+      last.top
+        ? `Zadnjič ${bridge ? `${topReps}+ ponovitev` : `na vrhu razpona ${range}`} — dodaj ${fmt(rule.step)} kg.`
+        : `Zadnjič vse serije na ${rule.max}+ — čas je za dodatno utež (${fmt(rule.step)} kg).`);
   }
 
-  const target = below ? Array(n).fill(rule.min) : reps.map(r => Math.min(rule.max, r + 1));
-  return { type: 'reps', kg: last.top, reps: target, sets: n, rule, title: `${last.top ? fmt(last.top) + ' kg' : 'lastna teža'} × ${target.join(', ')}`,
-    reason: below
+  const target = below ? reps.map(r => Math.max(rule.min, Math.min(topReps, r + 1))) : reps.map(r => Math.min(topReps, r + 1));
+  const pctStep = last.top ? Math.round(rule.step / last.top * 100) : 0;
+  return result('reps', last.top, target, `${kgLabel(last.top)} × ${target.join(', ')}`,
+    below
       ? `Zadnjič pod ${rule.min} ponovitev — ista teža, cilj ${rule.min} v vsaki seriji.`
-      : `Ista teža, dodaj ponovitev — ko so vse serije na ${rule.max}, dvigneš težo.`, last: lastText };
+      : bridge
+        ? `Naslednji korak (+${fmt(rule.step)} kg) je za to težo velik (+${pctStep} %) — najprej ponovitve do ${topReps}, potem dvigni.`
+        : `Ista teža, dodaj ponovitev — ko so serije na ${rule.max}, dvigneš težo.`);
 }

@@ -3,7 +3,7 @@
 // weight — for several weeks. Lighter sessions (bad days, deloads) neither
 // count as progress nor reset anything.
 import { exerciseHistory, allExercises } from './stats.js';
-import { workingSets, ruleFor } from './progression.js';
+import { workingSets, effectiveRule } from './progression.js';
 import { isoDate, addDays, fromIso } from './util.js';
 import { sleepMinutes } from './analysis.js';
 
@@ -82,7 +82,7 @@ export function plateauFor(data, name, now = new Date()) {
   if (since < MIN_SESSIONS_SINCE || days < weeks * 7) return null;
 
   const best = hist.filter(h => h.dateISO <= lastProgress).map(sessionScore).reduce((a, s) => (s.top > a.top ? s : a), { top: 0, maxReps: 0 });
-  const rule = ruleFor(data, name);
+  const rule = effectiveRule(data, name);
   const lastScore = sessionScore(last);
 
   // On a cut, flat strength while bodyweight drops is not a plateau to fix.

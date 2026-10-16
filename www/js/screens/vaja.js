@@ -2,11 +2,11 @@ import { store } from '../state.js';
 import { fromIso, fmtDate, fmtDateShort, fmtNum, fmtNum1, escapeHtml } from '../util.js';
 import { exerciseHistory } from '../stats.js';
 import { lineChartHtml } from '../components/lineChart.js';
-import { recommend, ruleFor, setRule } from '../progression.js';
+import { recommend, ruleFor, effectiveRule, setRule } from '../progression.js';
 import { plateauFor } from '../plateau.js';
 
 function progressionHtml(name) {
-  const rule = ruleFor(store.data, name);
+  const rule = effectiveRule(store.data, name);
   const rec = rule.off ? null : recommend(store.data, name);
   const step = String(rule.step).replace('.', ',');
   const btn = (action, label) => `<button type="button" data-action="${action}" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--fill); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">${label}</button>`;
@@ -17,7 +17,7 @@ function progressionHtml(name) {
 </div>
 ${rule.off
     ? '<div style="font-size: 14px; color: var(--text2)">Predlogi za to vajo so izklopljeni.</div>'
-    : `<div style="font-size: 14px">Double progression: ${rule.min}–${rule.max} ponovitev, nato +${step} kg.</div>
+    : `<div style="font-size: 14px">Double progression: ${rule.min}–${rule.max} ponovitev, nato +${step} kg.${rule.inferred ? ' <span style="color: var(--text2)">Razpon je določen iz tvojih treningov.</span>' : ''}</div>
 ${rec ? `<div style="background: var(--fill); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px">
 <span style="font-size: 12px; color: var(--text2)">Naslednjič</span>
 <span style="font-size: 16px; font-weight: 700">${rec.title}</span>
@@ -195,10 +195,10 @@ export function mount(root, ctx) {
     root.querySelectorAll('[data-action="metric"]').forEach(b => b.addEventListener('click', () => { metricIdx = Number(b.dataset.i); render(); }));
     root.querySelectorAll('[data-action="range"]').forEach(b => b.addEventListener('click', () => { rangeIdx = Number(b.dataset.i); render(); }));
     root.querySelector('[data-action="editRange"]')?.addEventListener('click', () => {
-      const r = ruleFor(store.data, name);
+      const r = effectiveRule(store.data, name);
       const val = prompt('Razpon ponovitev (npr. 6-8):', `${r.min}-${r.max}`);
       const m = /^\s*(\d{1,2})\s*[-–]\s*(\d{1,2})\s*$/.exec(val || '');
-      if (m && Number(m[1]) >= 1 && Number(m[2]) > Number(m[1])) { setRule(store.data, name, { min: Number(m[1]), max: Number(m[2]) }); store.save(); }
+      if (m && Number(m[1]) >= 1 && Number(m[2]) > Number(m[1])) { setRule(store.data, name, { min: Number(m[1]), max: Number(m[2]), inferred: false }); store.save(); }
     });
     root.querySelector('[data-action="editStep"]')?.addEventListener('click', () => {
       const r = ruleFor(store.data, name);

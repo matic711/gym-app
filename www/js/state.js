@@ -1,4 +1,5 @@
 import { SL_TO_EN } from './exercises.js';
+import { lockRanges } from './progression.js';
 
 const STORAGE_KEY = 'gymapp:v1';
 
@@ -188,6 +189,7 @@ function migrate(data) {
     if (data.activeWorkout) (data.activeWorkout.exercises || []).forEach(rename);
     data.meta.englishExerciseNames = true;
   }
+  if (data.settings && data.workouts) lockRanges(data);
   return data;
 }
 

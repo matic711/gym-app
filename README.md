@@ -19,17 +19,19 @@ Imena vaj so v angleščini (knjižnica v `exercises.js`). Starejši podatki s s
 prvem zagonu enkrat preimenujejo (`SL_TO_EN`), iskanje vaj pa razume tudi slovenske besede.
 
 ## Predlogi teže – double progression (`www/js/progression.js`)
-Za vsako vajo pogleda zadnji trening te vaje (delovne serije = serije z najvišjo težo):
-- vse serije na vrhu razpona → +korak teže, cilj spodnja meja ponovitev,
-- sicer ista teža in +1 ponovitev (pod spodnjo mejo: cilj spodnja meja),
-- dvakrat zapored pod razponom pri isti teži → −10 % (deload),
-- slab jutranji vpis (spanec < 6 h, kakovost 1/5 ali stres ≥ 8) → namesto dviga „drži težo“.
-- lažji trening (delovna teža ≥ 5 % pod prejšnjim treningom) se preskoči in predlog izhaja iz
-  zadnjega normalnega; dvakrat zapored lažje (ali deload, ki ga je predlagala aplikacija) je nova raven.
-
-Privzeto: compound 6–8 pon. (noge +5 kg, ostalo +2,5 kg), izolacija in kabli 10–15 pon. +2,5 kg,
-lastna teža 6–12 pon. nato +2,5 kg uteži; core/kardio brez predlogov. Za vsako vajo se nastavi
-na zaslonu vaje (Napredovanje). Med treningom ✓ na prazni seriji prevzame predlagane vrednosti.
+Za vsako vajo pogleda zadnji trening te vaje. Delovne serije = serije z najvišjo težo; ogrevalne in
+back-off serije se ohranijo in premaknejo sorazmerno z delovno težo.
+- Razpon ponovitev: privzeto compound 6–8 (noge +5 kg, ostalo +2,5 kg), izolacija 10–15, lastna teža 6–12.
+  Če nekdo vajo dela izven tega (npr. squat 3×5 ali bench 3×10), se razpon določi iz njegovih prvih
+  treningov (4–6, 10–12 …) in se po 3 treningih zaklene; na zaslonu vaje ga lahko spremeniš.
+- Vse delovne serije na vrhu razpona (zadnja sme biti ponovitev krajša) → +korak teže, cilj spodnja meja.
+- Sicer ista teža in +1 ponovitev. Če je naslednji korak teže prevelik za to težo (npr. 10 → 12,5 kg),
+  najprej predlaga več ponovitev, da skok ne pade pod razpon.
+- Dvakrat zapored pod razponom (prva serija ali povprečje) pri isti teži brez napredka → ~−10 %
+  (vedno vsaj en korak).
+- Slab jutranji vpis (spanec < 6 h, kakovost 1/5 ali stres ≥ 8) → namesto dviga „drži težo“.
+- Lažji trening (delovna teža ≥ 5 % pod prejšnjim) se preskoči; dvakrat zapored lažje je nova raven.
+Med treningom ✓ na prazni seriji prevzame predlog za to vrstico, „Uporabi“ izpolni vse vrstice.
 
 ## Analitika (zaslon `analitika`)
 Obdobje velja za ves zaslon: Teden in Mesec sta koledarska (kot poročila), 3 mes./Leto/Vse se končajo danes.

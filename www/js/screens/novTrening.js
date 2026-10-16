@@ -1,13 +1,19 @@
 import { store, uid, isoDate } from '../state.js';
 import { fmtNum } from '../util.js';
 import { openExercisePicker } from '../components/exercisePicker.js';
-import { recommend } from '../progression.js';
+import { recommend, lockRanges } from '../progression.js';
 import { plateauFor } from '../plateau.js';
 
 const REC_COLORS = { up: 'var(--good)', reps: 'var(--accentText)', hold: 'var(--mood)', deload: 'var(--danger)' };
 const REC_ICONS = { up: '↑', reps: '+1', hold: '=', deload: '↓' };
 
 function fmtKgInput(kg) { return String(Math.round(kg * 100) / 100).replace('.', ','); }
+
+// Suggested weight/reps for set row si: the planned row, or another working set past the plan.
+function planRow(rec, si) {
+  if (rec.plan && rec.plan[si]) return rec.plan[si];
+  return { kg: rec.kg, reps: rec.reps[rec.reps.length - 1], working: true };
+}
 
 function findPrevSet(data, exerciseName, setIndex) {
   const sorted = [...data.workouts].sort((a, b) => b.dateISO.localeCompare(a.dateISO));
@@ -72,8 +78,8 @@ function computeVals(data) {
         s, si,
         n: si + 1,
         prev,
-        kgHint: rec ? fmtKgInput(rec.kg) : hint[0] === '—' ? '0' : hint[0],
-        repHint: rec ? String(rec.reps[Math.min(si, rec.reps.length - 1)]) : hint[1] || '0',
+        kgHint: rec ? fmtKgInput(planRow(rec, si).kg) : hint[0] === '—' ? '0' : hint[0],
+        repHint: rec ? String(planRow(rec, si).reps) : hint[1] || '0',
         rowStyle: rowBase + (s.done ? ' background: var(--accentSoft);' : ''),
         checkStyle: checkBase + (s.done ? ' background: var(--accent); color: var(--onAccent);' : ' background: var(--fill); color: var(--text2);'),
         restBefore: null
@@ -251,14 +257,15 @@ export function mount(root, ctx) {
         const ei = Number(btn.getAttribute('data-ei'));
         const rec = recommend(store.data, store.data.activeWorkout.exercises[ei].name);
         if (!rec) return;
+        const rows = rec.plan && rec.plan.length ? rec.plan : rec.reps.map(r => ({ kg: rec.kg, reps: r }));
         mutate(w => {
           const sets = w.exercises[ei].sets;
-          while (sets.length < rec.sets) sets.push({ kg: '', reps: '', done: false });
-          for (let i = 0; i < rec.sets; i++) {
-            if (sets[i].done) continue;
-            sets[i].kg = fmtKgInput(rec.kg);
-            sets[i].reps = String(rec.reps[i]);
-          }
+          while (sets.length < rows.length) sets.push({ kg: '', reps: '', done: false });
+          rows.forEach((row, i) => {
+            if (sets[i].done) return;
+            sets[i].kg = fmtKgInput(row.kg);
+            sets[i].reps = String(row.reps);
+          });
         });
       });
     });
@@ -313,6 +320,7 @@ export function mount(root, ctx) {
         })).filter(ex => ex.sets.length)
       });
       store.data.activeWorkout = null;
+      lockRanges(store.data);
       store.save();
       ctx.navigate('home');
     });
