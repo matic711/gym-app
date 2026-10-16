@@ -3,7 +3,7 @@
 // weight — for several weeks. Lighter sessions (bad days, deloads) neither
 // count as progress nor reset anything.
 import { exerciseHistory, allExercises } from './stats.js';
-import { workingSets, effectiveRule } from './progression.js';
+import { workingSets, progressionSets, effectiveRule } from './progression.js';
 import { isoDate, addDays, fromIso } from './util.js';
 import { sleepMinutes } from './analysis.js';
 
@@ -35,18 +35,18 @@ const VARIATIONS = {
 function daysBetween(aIso, bIso) { return Math.round((fromIso(bIso) - fromIso(aIso)) / DAY_MS); }
 function fmtKg(kg) { return Number.isInteger(kg) ? String(kg) : String(kg).replace('.', ','); }
 
-function sessionScore(session) {
-  const ws = workingSets(session);
+function sessionScore(session, rule) {
+  const ws = rule ? progressionSets(session, rule) : workingSets(session);
   const reps = ws.sets.map(s => s.reps);
   return { top: ws.top, maxReps: reps.length ? Math.max(...reps) : 0, totalReps: reps.reduce((a, b) => a + b, 0), sets: ws.sets.length };
 }
 
 // Dates on which the exercise progressed (first session counts as the start).
-export function progressDates(hist) {
+export function progressDates(hist, rule) {
   const out = [];
   let best = null;
   for (const h of hist) {
-    const s = sessionScore(h);
+    const s = sessionScore(h, rule);
     if (!s.sets) continue;
     if (!best) { best = s; out.push(h.dateISO); continue; }
     const progressed = s.top > best.top || (s.top === best.top && (s.maxReps > best.maxReps || s.totalReps > best.totalReps));
@@ -74,16 +74,16 @@ export function plateauFor(data, name, now = new Date()) {
   const last = hist[hist.length - 1];
   if (daysBetween(last.dateISO, todayIso) > ACTIVE_DAYS) return null;
 
-  const dates = progressDates(hist);
+  const rule = effectiveRule(data, name);
+  const dates = progressDates(hist, rule);
   const lastProgress = dates[dates.length - 1];
   const since = hist.filter(h => h.dateISO > lastProgress).length;
   const days = daysBetween(lastProgress, todayIso);
   const weeks = plateauWeeks(data.settings);
   if (since < MIN_SESSIONS_SINCE || days < weeks * 7) return null;
 
-  const best = hist.filter(h => h.dateISO <= lastProgress).map(sessionScore).reduce((a, s) => (s.top > a.top ? s : a), { top: 0, maxReps: 0 });
-  const rule = effectiveRule(data, name);
-  const lastScore = sessionScore(last);
+  const best = hist.filter(h => h.dateISO <= lastProgress).map(h => sessionScore(h, rule)).reduce((a, s) => (s.top > a.top ? s : a), { top: 0, maxReps: 0 });
+  const lastScore = sessionScore(last, rule);
 
   // On a cut, flat strength while bodyweight drops is not a plateau to fix.
   const w0 = weightAround(data, lastProgress), w1 = weightAround(data, todayIso);
@@ -99,7 +99,7 @@ export function plateauFor(data, name, now = new Date()) {
     const stress = avgWellness(data, from14, todayIso, e => e.stress);
     if (sleep != null && sleep < 7 * 60) tips.push({ key: 'sleep', text: `Najprej spanec: zadnja 2 tedna povprečno ${Math.floor(sleep / 60)} h ${String(Math.round(sleep % 60)).padStart(2, '0')} min. Pod 7 h je napredek težji.` });
     if (stress != null && stress >= 7) tips.push({ key: 'stress', text: `Stres je zadnja 2 tedna povprečno ${String(Math.round(stress * 10) / 10).replace('.', ',')}/10 — to zavira okrevanje.` });
-    const hadDeload = hist.some(h => h.dateISO > lastProgress && sessionScore(h).top > 0 && sessionScore(h).top <= best.top * 0.92);
+    const hadDeload = hist.some(h => h.dateISO > lastProgress && sessionScore(h, rule).top > 0 && sessionScore(h, rule).top <= best.top * 0.92);
     let deloadKg = Math.floor(best.top * 0.9 / 2.5) * 2.5;
     if (deloadKg >= best.top) deloadKg = best.top - 2.5;
     if (best.top > 0 && deloadKg > 0 && !hadDeload) {

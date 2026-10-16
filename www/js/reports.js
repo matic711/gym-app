@@ -2,7 +2,7 @@
 // past week or month can be opened again.
 import { isoDate, addDays, fromIso, startOfWeek, fmtDateShort, workoutVolume, plural, MONTHS } from './util.js';
 import { exerciseHistory, allExercises } from './stats.js';
-import { workingSets } from './progression.js';
+import { workingSets, progressionSets, effectiveRule } from './progression.js';
 import { progressDates, detectPlateaus } from './plateau.js';
 import { sessionPerformances, sleepMinutes } from './analysis.js';
 import { nutritionEnabled, averageIntake, goalsOf } from './nutrition.js';
@@ -69,10 +69,14 @@ function progressIn(data, p) {
     if (!inP.length) continue;
     const before = hist.filter(h => h.dateISO < p.startIso);
     if (!before.length) continue;
-    const dates = progressDates(hist).filter(d => d >= p.startIso);
+    const rule = effectiveRule(data, e.name);
+    const dates = progressDates(hist, rule).filter(d => d >= p.startIso);
     if (!dates.length) continue;
-    const b = workingSets(before[before.length - 1]);
-    const best = inP.map(workingSets).reduce((a, s) => (s.top > a.top || (s.top === a.top && Math.max(...s.sets.map(x => x.reps)) > Math.max(...a.sets.map(x => x.reps))) ? s : a));
+    const bs = before.map(h => progressionSets(h, rule)).filter(s => s.sets.length);
+    const ps = inP.map(h => progressionSets(h, rule)).filter(s => s.sets.length);
+    if (!bs.length || !ps.length) continue;
+    const b = bs[bs.length - 1];
+    const best = ps.reduce((a, s) => (s.top > a.top || (s.top === a.top && Math.max(...s.sets.map(x => x.reps)) > Math.max(...a.sets.map(x => x.reps))) ? s : a));
     const text = best.top > b.top
       ? `${fmtKg(b.top)} → ${fmtKg(best.top)} kg`
       : `${fmtKg(best.top)} kg: ${b.sets.map(s => s.reps).join(', ')} → ${best.sets.map(s => s.reps).join(', ')}`;

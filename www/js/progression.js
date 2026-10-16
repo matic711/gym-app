@@ -61,7 +61,9 @@ function median(xs) {
 
 // Reps the lifter usually does on the first working set (last 8 sessions).
 function typicalReps(hist) {
-  const firsts = hist.slice(-8).map(h => workingSets(h).sets[0]).filter(Boolean).map(s => s.reps);
+  const recent = hist.slice(-8);
+  let firsts = recent.map(h => progressionSets(h, { min: 5 }).sets[0]).filter(Boolean).map(s => s.reps);
+  if (firsts.length < recent.length / 2) firsts = recent.map(h => workingSets(h).sets[0]).filter(Boolean).map(s => s.reps); // trains heavy singles/doubles
   return firsts.length ? median(firsts) : null;
 }
 
@@ -116,6 +118,21 @@ export function workingSets(session) {
   return { top, sets: sets.filter(s => s.kg === top) };
 }
 
+// Reps at or below this are heavy test sets (a single, double or triple) for
+// someone who trains this exercise in a higher range.
+function testRepCut(min) { return min >= 5 ? 3 : min >= 4 ? 2 : 0; }
+
+// Working sets for progression: like workingSets, but heavy test sets (e.g. a
+// 100 × 2 for someone who benches 80 × 8) don't count. { top, sets, normal, tests }
+export function progressionSets(session, rule) {
+  const cut = testRepCut(rule ? rule.min : 0);
+  const all = session.sets.map(s => ({ kg: Number(s.kg) || 0, reps: Number(s.reps) || 0 })).filter(s => s.reps > 0);
+  const normal = all.filter(s => s.reps > cut || s.kg === 0);
+  const tests = all.filter(s => !(s.reps > cut || s.kg === 0));
+  const top = Math.max(0, ...normal.map(s => s.kg));
+  return { top, sets: normal.filter(s => s.kg === top), normal, tests };
+}
+
 function roundTo(x, step) { return Math.max(step, Math.round(x / step) * step); }
 
 function fmt(kg) { return Number.isInteger(kg) ? String(kg) : String(kg).replace('.', ','); }
@@ -137,9 +154,35 @@ export function recommend(data, name, now = new Date()) {
   const base0 = ruleFor(data, name);
   if (base0.off) return null;
   const todayIso = isoDate(now);
-  const hist = exerciseHistory(data, name).filter(h => h.dateISO <= todayIso);
+  let hist = exerciseHistory(data, name).filter(h => h.dateISO <= todayIso);
   if (!hist.length) return null;
-  const rule = withInferredRange(base0, hist);
+  let rule = withInferredRange(base0, hist);
+
+  // A test day — only heavy singles/doubles, or a heavy test with nothing but
+  // warm-ups/back-offs below the usual working weight — is skipped: the
+  // suggestion comes from the last normal session. So is a one-off big jump
+  // that landed under the range (80 × 8 → 95 × 4); doing the new weight a
+  // second time makes it the working weight.
+  const testDayNote = (session, prevSession) => {
+    const ps = progressionSets(session, rule);
+    const prevTop = prevSession ? progressionSets(prevSession, rule).top : 0;
+    if (ps.tests.length && (!ps.normal.length || (prevTop > 0 && ps.top < prevTop * 0.95))) {
+      const t = ps.tests.reduce((a, x) => (x.kg > a.kg ? x : a));
+      return `${fmt(t.kg)} kg × ${t.reps} je bil test (težka serija), zato predlog izhaja iz zadnjega normalnega treninga.`;
+    }
+    if (prevTop > 0 && ps.sets.length && ps.sets[0].reps < rule.min && ps.top > prevTop * 1.05 && ps.top > prevTop + 2 * rule.step) {
+      return `${fmt(ps.top)} kg × ${ps.sets[0].reps} je bil velik skok od ${fmt(prevTop)} kg, zato predlog izhaja iz zadnjega normalnega treninga.`;
+    }
+    return null;
+  };
+  let testNote = null;
+  while (hist.length > 1) {
+    const note = testDayNote(hist[hist.length - 1], hist[hist.length - 2]);
+    if (!note) break;
+    if (!testNote) testNote = note;
+    hist = hist.slice(0, -1);
+  }
+  const withNote = r => (r && testNote ? { ...r, note: r.note ? `${testNote} ${r.note}` : testNote } : r);
 
   // A lighter-than-usual session (a bad day) shouldn't reset the baseline: when
   // the last working weight is at least 5 % under the session before it, suggest
@@ -148,17 +191,25 @@ export function recommend(data, name, now = new Date()) {
   // deload this function asked for.
   if (hist.length >= 2) {
     const last = hist[hist.length - 1], prev = hist[hist.length - 2];
-    const lt = workingSets(last).top, pt = workingSets(prev).top;
+    const lt = progressionSets(last, rule).top, pt = progressionSets(prev, rule).top;
     const gapDays = Math.round((fromIso(last.dateISO) - fromIso(prev.dateISO)) / 86400000);
     if (lt > 0 && pt > 0 && lt < pt * 0.95 && gapDays <= 28) {
       const base = suggestFrom(data, hist.slice(0, -1), rule, now);
       if (base && base.type !== 'deload') {
-        return { ...base, last: `${base.last} (${fmtDateShort(fromIso(prev.dateISO))})`,
-          note: `Zadnji trening (${fmt(lt)} kg) je bil lažji, zato ga predlog ne upošteva.` };
+        return withNote({ ...base, last: `${base.last} (${fmtDateShort(fromIso(prev.dateISO))})`,
+          note: `Zadnji trening (${fmt(lt)} kg) je bil lažji, zato ga predlog ne upošteva.` });
       }
     }
   }
-  return suggestFrom(data, hist, rule, now);
+  const r = suggestFrom(data, hist, rule, now);
+  if (r && !testNote) {
+    const t = progressionSets(hist[hist.length - 1], rule).tests;
+    if (t.length) {
+      const best = t.reduce((a, s) => (s.kg > a.kg ? s : a));
+      return { ...r, note: `Težka serija ${fmt(best.kg)} kg × ${best.reps} ni štela kot delovna serija.` };
+    }
+  }
+  return withNote(r);
 }
 
 function floorTo(x, step) { return Math.floor(x / step + 1e-9) * step; }
@@ -166,11 +217,12 @@ function floorTo(x, step) { return Math.floor(x / step + 1e-9) * step; }
 // Set-by-set plan following the order of the last session: working sets get
 // the suggestion, warm-up and back-off sets keep their reps and move with the
 // working weight.
-function planFrom(session, top, workKg, targets) {
+function planFrom(session, top, workKg, targets, rule) {
   let w = 0;
+  const cut = testRepCut(rule.min);
   return session.sets
     .map(s => ({ kg: Number(s.kg) || 0, reps: Number(s.reps) || 0 }))
-    .filter(s => s.reps > 0)
+    .filter(s => s.reps > 0 && (s.reps > cut || s.kg === 0)) // heavy test sets aren't repeated
     .map(s => {
       if (s.kg === top) return { kg: workKg, reps: targets[Math.min(w++, targets.length - 1)], working: true };
       let kg = s.kg;
@@ -181,7 +233,7 @@ function planFrom(session, top, workKg, targets) {
 
 function suggestFrom(data, hist, rule, now) {
   const session = hist[hist.length - 1];
-  const last = workingSets(session);
+  const last = progressionSets(session, rule);
   if (!last.sets.length) return null;
   const reps = last.sets.map(s => s.reps);
   const n = reps.length;
@@ -190,7 +242,7 @@ function suggestFrom(data, hist, rule, now) {
   const range = `${rule.min}–${rule.max}`;
   const kgLabel = kg => (kg ? fmt(kg) + ' kg' : 'lastna teža');
   const result = (type, kg, targets, title, reason) => {
-    const plan = planFrom(session, last.top, kg, targets);
+    const plan = planFrom(session, last.top, kg, targets, rule);
     return { type, kg, reps: targets, sets: n, plan, rule, title, reason, last: lastText };
   };
 
@@ -210,7 +262,7 @@ function suggestFrom(data, hist, rule, now) {
   // Two sessions in a row under the range at the same weight, without
   // improving → back off by about 10 % (always at least one step).
   if (below && hist.length >= 2 && last.top > 0) {
-    const prev = workingSets(hist[hist.length - 2]);
+    const prev = progressionSets(hist[hist.length - 2], rule);
     const prevTotal = prev.sets.reduce((a, s) => a + s.reps, 0);
     if (prev.top === last.top && isBelow(prev.sets.map(s => s.reps)) && total <= prevTotal) {
       let kg = floorTo(last.top * 0.9, rule.step);
@@ -235,11 +287,12 @@ function suggestFrom(data, hist, rule, now) {
         : `Zadnjič vse serije na ${rule.max}+ — čas je za dodatno utež (${fmt(rule.step)} kg).`);
   }
 
-  const target = below ? reps.map(r => Math.max(rule.min, Math.min(topReps, r + 1))) : reps.map(r => Math.min(topReps, r + 1));
+  // Under the range: one more rep per set (not straight to the bottom of the range — 4 → 6 is a lot).
+  const target = reps.map(r => Math.min(topReps, r + 1));
   const pctStep = last.top ? Math.round(rule.step / last.top * 100) : 0;
   return result('reps', last.top, target, `${kgLabel(last.top)} × ${target.join(', ')}`,
     below
-      ? `Zadnjič pod ${rule.min} ponovitev — ista teža, cilj ${rule.min} v vsaki seriji.`
+      ? `Zadnjič pod ${rule.min} ponovitev — ista teža, ponovitev več na serijo, dokler ne prideš na ${rule.min}.`
       : bridge
         ? `Naslednji korak (+${fmt(rule.step)} kg) je za to težo velik (+${pctStep} %) — najprej ponovitve do ${topReps}, potem dvigni.`
         : `Ista teža, dodaj ponovitev — ko so serije na ${rule.max}, dvigneš težo.`);
