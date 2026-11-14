@@ -439,7 +439,7 @@ export function resultText(r) {
 export function startProgram(data, key, oneRm, now = new Date(), opts = {}) {
   const ex = experimentOf(data);
   if (oneRm > 0) ex.oneRm = oneRm;
-  ex.active = { id: 'p' + Date.now().toString(36), key, startISO: isoDate(now), basis: ex.oneRm };
+  ex.active = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), key, startISO: isoDate(now), basis: ex.oneRm };
   if (opts.weeks) ex.active.weeks = opts.weeks;
   if (opts.planIdx != null) ex.active.planIdx = opts.planIdx;
 }
@@ -449,13 +449,17 @@ export function startProgram(data, key, oneRm, now = new Date(), opts = {}) {
 // Three 6-week programs back to back (each ends with a 1RM test), with an easy
 // week after the first. Forecasts are kg on top of the 1RM a program starts
 // with: [low, expected, high]. An intermediate bench (~110 kg) typically adds
-// 1–2 kg a month; a new program and test practice add a little at first.
+// 1–2 kg a month; after 1,5 years at ~5 bench sets a week, the jump in volume
+// (Sheiko ~11 sets) should bring more at first. Ordered from most to least
+// volume, so the results also show whether volume was the limiter.
 export const PLAN_PROGRAMS = [
-  { key: 'sheiko', weeks: 6, forecast: [0, 2.5, 5], why: 'Najprej volumen in tehnika pri 70–85 % — dobra osnova, malo utrujenosti pred prazniki.' },
-  { key: 'gzclp', weeks: 6, forecast: [0, 2.5, 5], why: 'Težke trojke z zadnjo serijo do odpovedi + 3 × 10; teže sledijo tvojim rezultatom.' },
-  { key: 'texas', weeks: 6, forecast: [0, 2.5, 5], why: 'Na koncu vsak teden nov 5RM — najbolj neposredno vodi v vrh moči konec marca.' }
+  { key: 'sheiko', weeks: 6, forecast: [0, 5, 7.5], sets: 11, why: 'Največ volumna: ~11 bench serij na teden (2× več kot do zdaj) pri 70–85 %. Pokaže, ali je bil problem volumen.' },
+  { key: 'gzclp', weeks: 6, forecast: [0, 2.5, 5], sets: 8, why: 'Vmes: ~8 serij na teden — težke trojke z zadnjo serijo do odpovedi in 3 × 10; teže sledijo tvojim rezultatom.' },
+  { key: 'texas', weeks: 6, forecast: [0, 2.5, 5], sets: 6, why: 'Malo volumna (~6 serij), veliko intenzivnosti: vsak teden nov 5RM. Kontrast Sheiku in vrh moči konec marca.' }
 ];
-export const PLAN_FINAL = [2.5, 7.5, 12.5];
+export const PLAN_FINAL = [2.5, 10, 15];
+
+const r25n = x => Math.trunc(x / 2.5) * 2.5; // toward zero: one test is noisy
 
 export function makePlan(data, now = new Date(), endISO = '2027-03-31') {
   const ex = experimentOf(data);
@@ -484,20 +488,43 @@ export function planStatus(data) {
   const ex = experimentOf(data);
   const plan = ex.plan;
   if (!plan) return null;
+  // Current forecasts and texts for the plan's programs (plans saved earlier included).
+  const base = it => PLAN_PROGRAMS.find(p => p.key === it.key) || it;
   const items = plan.items.map((it, i) => {
     const hist = ex.history.find(h => h.planIdx === i && !h.stopped);
     const running = ex.active && ex.active.planIdx === i ? ex.active : null;
-    const basis = hist ? hist.basis : running ? running.basis : null;
-    const range = basis != null ? it.forecast.map(f => basis + f) : null;
-    let verdict = null;
     const result = hist ? computeResult(data, hist) : null;
-    if (result && result.kind === '1rm' && range) {
-      verdict = result.kg > range[2] ? 'nad zgornjo mejo' : result.kg > range[1] ? 'nad pričakovanim' : result.kg === range[1] ? 'kot pričakovano' : result.kg >= range[0] ? 'pod pričakovanim, a v razponu' : 'pod spodnjo mejo';
-    }
-    return { ...it, idx: i, prog: programByKey(it.key), state: hist ? 'done' : running ? 'running' : 'waiting', hist, result, range, verdict };
+    return { ...it, why: base(it).why, sets: base(it).sets, forecast: base(it).forecast, idx: i, prog: programByKey(it.key),
+      state: hist ? 'done' : running ? 'running' : 'waiting', hist, running, result };
   });
+  // After each test the forecast for what's left follows the actual pace: half
+  // of the average difference to the expected gain (one test is noisy).
+  const tested = items.filter(it => it.state === 'done' && it.result && it.result.kind === '1rm');
+  const diffs = tested.map(it => it.result.kg - (it.hist.basis + it.forecast[1]));
+  const adj = diffs.length ? r25n(0.5 * diffs.reduce((a, b) => a + b, 0) / diffs.length) : 0;
+  for (const it of items) {
+    if (it.state === 'done') {
+      // A finished program is judged against the forecast it started with.
+      it.range = it.forecast.map(f => it.hist.basis + f);
+      const kg = it.result && it.result.kind === '1rm' ? it.result.kg : null;
+      if (kg != null) it.verdict = kg > it.range[2] ? 'nad zgornjo mejo' : kg > it.range[1] ? 'nad pričakovanim' : kg === it.range[1] ? 'kot pričakovano' : kg >= it.range[0] ? 'pod pričakovanim, a v razponu' : 'pod spodnjo mejo';
+      continue;
+    }
+    const f = it.forecast.map(v => Math.max(0, v + adj));
+    it.adjusted = adj !== 0;
+    it.forecast = [Math.min(f[0], f[1]), f[1], Math.max(f[1], f[2])];
+    it.range = it.running ? it.forecast.map(v => it.running.basis + v) : null;
+  }
   const next = items.find(it => it.state === 'waiting' && !items.some(o => o.state === 'running'));
-  return { plan, items, next: next || null, final: plan.final.map(f => plan.basis + f) };
+  // Last test: from the plan's start until there's a result, then from the latest 1RM.
+  let final;
+  if (!tested.length) final = PLAN_FINAL.map(f => plan.basis + f);
+  else {
+    const left = items.filter(it => it.state !== 'done');
+    const cur = ex.oneRm;
+    final = [0, 1, 2].map(k => cur + left.reduce((a, it) => a + it.forecast[k], 0));
+  }
+  return { plan, items, next: next || null, final, adj, adapted: tested.length > 0 };
 }
 
 export function acceptPlan(data, now = new Date()) {

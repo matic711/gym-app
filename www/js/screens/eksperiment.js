@@ -166,6 +166,7 @@ ${i === 0 && ps.plan.breakWeek ? small(`${dShort(ps.plan.breakWeek.startISO)} �
 <div style="font-size: 12px; color: var(--text2)">Vrh moči na zadnjem testu</div>
 <div style="font-size: 17px; font-weight: 700">pričakovano ${fmtKg(fin[1])} kg</div>
 ${small(`Spodnja meja ${fmtKg(fin[0])} kg · zgornja ${fmtKg(fin[2])} kg · zdaj ${fmtKg(now)} kg`)}
+${ps.adapted ? small(ps.adj > 0 ? `Napoved je dvignjena za ${fmtKg(ps.adj)} kg na program — napreduješ hitreje od pričakovanega.` : ps.adj < 0 ? `Napoved je znižana za ${fmtKg(-ps.adj)} kg na program — napredek je počasnejši od pričakovanega.` : 'Napredek gre po napovedi.', 'var(--accentText)') : small('Napoved se po vsakem testu prilagodi tvojemu dejanskemu tempu.')}
 </div>
 ${small('Razlika 2,5 kg med programi je v okviru dnevnega nihanja, zato štejeta tudi ocena programa in kako so šli treningi.')}
 <button type="button" data-action="dropPlan" style="border: 0; background: transparent; padding: 0; color: var(--text2); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer">Opusti načrt</button>`);
