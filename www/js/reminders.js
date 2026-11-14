@@ -15,12 +15,24 @@ export function morningTime(settings) {
   return m ? { h: Math.min(23, Number(m[1])), m: Math.min(59, Number(m[2])) } : { h: 7, m: 30 };
 }
 
+// Reasons for skipping the morning check-in ("Danes ne morem").
+export const SKIP_REASONS = ['Nimam tehtnice (na poti)', 'Bolan sem', 'Drugo'];
+
+export function skipOf(data, iso) {
+  return (data.wellnessSkips || {})[iso] || null;
+}
+
+// The morning check-in is done: logged, or skipped on purpose.
+export function morningDone(data, iso) {
+  return !!data.wellness[iso] || !!skipOf(data, iso);
+}
+
 // The app stays locked on the morning check-in until today's entry exists.
 export function needsMorningCheckin(data, now = new Date()) {
   const t = data.settings.toggles || {};
   if (t.morningGate === false || !tracksWellness(t)) return false;
   if (now.getHours() < 4) return false; // still "last night"
-  return !data.wellness[isoDate(now)];
+  return !morningDone(data, isoDate(now));
 }
 
 function daysBetween(fromIsoStr, toDate) {
@@ -101,7 +113,7 @@ export function computeReminders(data, now = new Date()) {
   }
 
   if (tracksWellness(t)) {
-    if (!data.wellness[todayIso]) {
+    if (!morningDone(data, todayIso)) {
       const parts = [t.trackWeight && 'teža', t.trackSleep && 'spanec', t.trackMood && 'počutje', t.trackEnergy && 'energija'].filter(Boolean);
       const mt = morningTime(data.settings);
       out.push({
@@ -112,7 +124,7 @@ export function computeReminders(data, now = new Date()) {
     }
     const yIso = isoDate(addDays(now, -1));
     const hasHistory = Object.keys(data.wellness).some(k => k < yIso);
-    if (hasHistory && !data.wellness[yIso]) {
+    if (hasHistory && !morningDone(data, yIso)) {
       out.push({ key: 'wellnessYesterday', urgent: false, title: 'Manjka včerajšnji vpis', sub: 'Dopolni ga, dokler se še spomniš', cta: 'Dopolni', route: 'zdravje', params: { date: yIso } });
     }
   }

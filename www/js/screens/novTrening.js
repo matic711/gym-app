@@ -1,17 +1,46 @@
 import { store, uid, isoDate } from '../state.js';
 import { fmtNum } from '../util.js';
 import { openExercisePicker } from '../components/exercisePicker.js';
-import { recommend, lockRanges } from '../progression.js';
+import { recommend, lockRanges, setDp, effectiveRule } from '../progression.js';
 import { plateauFor } from '../plateau.js';
+import { isBench, experimentRec, experimentOf, tagWorkout } from '../experiment.js';
 
-const REC_COLORS = { up: 'var(--good)', reps: 'var(--accentText)', hold: 'var(--mood)', deload: 'var(--danger)' };
-const REC_ICONS = { up: '↑', reps: '+1', hold: '=', deload: '↓' };
+const REC_COLORS = { up: 'var(--good)', reps: 'var(--accentText)', hold: 'var(--mood)', deload: 'var(--danger)', calib: 'var(--accentText)', program: 'var(--accentText)' };
+const REC_ICONS = { up: '↑', reps: '+1', hold: '=', deload: '↓', calib: '≈', program: '' };
+
+// The suggestion for an exercise: the bench experiment's session while a
+// program runs, otherwise double progression / the automatic suggestion.
+function recFor(data, name) {
+  if (isBench(name) && experimentOf(data).active) return experimentRec(data);
+  return recommend(data, name);
+}
+
+// Untouched exercises get exactly as many rows as the prescription has
+// (double progression or the bench program). Returns true if anything changed.
+function fitRows(data) {
+  const w = data.activeWorkout;
+  if (!w) return false;
+  let changed = false;
+  for (const ex of w.exercises) {
+    const untouched = ex.sets.every(st => !st.done && String(st.kg).trim() === '' && String(st.reps).trim() === '');
+    if (!untouched) continue;
+    const rec = recFor(data, ex.name);
+    if (!rec || !rec.plan || !rec.plan.length || !(rec.program || (rec.rule && rec.rule.dp))) continue;
+    if (ex.sets.length !== rec.plan.length) {
+      ex.sets = rec.plan.map(() => ({ kg: '', reps: '', done: false }));
+      changed = true;
+    }
+  }
+  return changed;
+}
 
 function fmtKgInput(kg) { return String(Math.round(kg * 100) / 100).replace('.', ','); }
 
 // Suggested weight/reps for set row si: the planned row, or another working set past the plan.
 function planRow(rec, si) {
   if (rec.plan && rec.plan[si]) return rec.plan[si];
+  const work = rec.plan ? rec.plan.filter(r => r.working) : [];
+  if (work.length) return { ...work[work.length - 1], label: '' };
   return { kg: rec.kg, reps: rec.reps[rec.reps.length - 1], working: true };
 }
 
@@ -65,8 +94,9 @@ function computeVals(data) {
   const checkBase = 'width: 44px; height: 36px; border: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer;';
 
   const exercises = w.exercises.map((ex, ei) => {
-    const rec = recommend(data, ex.name);
-    const plateau = rec ? plateauFor(data, ex.name) : null;
+    const rec0 = recFor(data, ex.name);
+    const rec = rec0 && !rec0.blocked ? rec0 : null;
+    const plateau = rec && !rec.program ? plateauFor(data, ex.name) : null;
     const rows = ex.sets.map((s, si) => {
       setCount++;
       const kgNum = parseFloat(String(s.kg).replace(',', '.')) || 0;
@@ -74,10 +104,12 @@ function computeVals(data) {
       if (s.done) { doneCount++; volume += kgNum * repsNum; }
       const prev = findPrevSet(data, ex.name, si);
       const hint = prev.split(' × ');
+      const pr = rec ? planRow(rec, si) : null;
       return {
         s, si,
         n: si + 1,
         prev,
+        label: pr && pr.label ? pr.label : '',
         kgHint: rec ? fmtKgInput(planRow(rec, si).kg) : hint[0] === '—' ? '0' : hint[0],
         repHint: rec ? String(planRow(rec, si).reps) : hint[1] || '0',
         rowStyle: rowBase + (s.done ? ' background: var(--accentSoft);' : ''),
@@ -91,14 +123,45 @@ function computeVals(data) {
         rows[i].restBefore = formatRestMs(curSet.doneAt - prevSet.doneAt);
       }
     }
-    return { ex, ei, rows, rec, plateau };
+    const soft = !rec0 || (!rec0.program && !(rec0.rule && rec0.rule.dp));
+    const dpOffer = soft ? effectiveRule(data, ex.name) : null;
+    return { ex, ei, rows, rec: rec0, plateau, dpOffer: dpOffer && !dpOffer.off ? dpOffer : null };
   });
 
   return { exercises, volume: fmtNum(volume), doneCount, setCount };
 }
 
+const applyBtn = ei => `<button type="button" data-action="applyRec" data-ei="${ei}" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--accent); color: var(--onAccent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0">Uporabi</button>`;
+
+function recCardHtml(rec, ei, ex, plateau, dpOffer) {
+  const box = (inner, side = '') => `<div style="margin: 0 4px; padding: 10px 10px 10px 12px; border-radius: 12px; background: var(--fill); display: flex; align-items: center; gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0">${inner}</div>${side}</div>`;
+  const small = (t, color = 'var(--text2)') => `<div style="font-size: 12px; color: ${color}">${t}</div>`;
+  if (rec.program) {
+    return box(`<a href="#/eksperiment" style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accentText); text-decoration: none">Bench eksperiment · ${rec.last} ›</a>
+<div style="font-size: 15px; font-weight: 700">${rec.title}</div>
+${small(rec.reason)}${rec.note ? small(rec.note, 'var(--mood)') : ''}`, rec.blocked ? '' : applyBtn(ei));
+  }
+  if (rec.rule && rec.rule.dp) {
+    const r = rec.rule;
+    const step = String(r.step).replace('.', ',');
+    const status = rec.type === 'up'
+      ? `<div style="padding: 6px 10px; border-radius: 10px; background: var(--good); color: var(--onAccent); font-size: 13px; font-weight: 700">Dvigni težo: ${fmtKgInput(rec.kg)} kg (+${step})</div>`
+      : rec.type === 'deload' ? small('Zmanjšaj težo in gradi nazaj.', 'var(--danger)')
+        : rec.toGo > 0 && rec.type !== 'calib' ? small(`Do ${fmtKgInput(rec.nextKg)} kg manjka še ${rec.toGo} ${rec.toGo === 1 ? 'ponovitev' : rec.toGo === 2 ? 'ponovitvi' : rec.toGo <= 4 ? 'ponovitve' : 'ponovitev'}.`, 'var(--text)') : '';
+    return box(`<a href="#/vaja?name=${encodeURIComponent(ex.name)}" style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accentText); text-decoration: none">Double progression · ${r.sets} × ${r.min}–${r.max} ›</a>
+<div style="font-size: 16px; font-weight: 700; color: ${REC_COLORS[rec.type] || 'var(--text)'}">Danes: ${rec.title}</div>
+${status}${small(rec.reason)}${small(`${rec.note ? 'Osnova' : 'Zadnjič'}: ${rec.last}`)}${rec.note ? small(rec.note, 'var(--mood)') : ''}
+${plateau && !plateau.cut ? `<a href="#/vaja?name=${encodeURIComponent(ex.name)}" style="font-size: 12px; font-weight: 600; color: var(--mood); text-decoration: none">Plato ${plateau.weeks} t. — poglej predloge →</a>` : ''}`, applyBtn(ei));
+  }
+  return box(`<div style="font-size: 14px; font-weight: 700; color: ${REC_COLORS[rec.type]}">${REC_ICONS[rec.type]} Predlog: ${rec.title}</div>
+${small(rec.reason)}${small(`${rec.note ? 'Osnova' : 'Zadnjič'}: ${rec.last}`)}${rec.note ? small(rec.note, 'var(--mood)') : ''}
+${plateau && !plateau.cut ? `<a href="#/vaja?name=${encodeURIComponent(ex.name)}" style="font-size: 12px; font-weight: 600; color: var(--mood); text-decoration: none">Plato ${plateau.weeks} t. — poglej predloge →</a>` : ''}
+${dpOffer ? `<button type="button" data-action="enableDp" data-ei="${ei}" style="align-self: flex-start; border: 0; background: transparent; padding: 2px 0; color: var(--accentText); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer">Vklopi double progression (${dpOffer.sets || 3} × ${dpOffer.min}–${dpOffer.max})</button>` : ''}`, applyBtn(ei));
+}
+
 function template(w, vm, restLabel) {
-  const exercisesHtml = vm.exercises.map(({ ex, ei, rows, rec, plateau }) => `
+  const exercisesHtml = vm.exercises.map(({ ex, ei, rows, rec, plateau, dpOffer }) => `
 <section style="background: var(--card); border-radius: 22px; padding: 16px 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow)">
 <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px">
 <div style="display: flex; flex-direction: column; gap: 2px">
@@ -109,17 +172,7 @@ function template(w, vm, restLabel) {
 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
 </button>
 </div>
-${rec ? `
-<div style="margin: 0 4px; padding: 10px 10px 10px 12px; border-radius: 12px; background: var(--fill); display: flex; align-items: center; gap: 10px">
-<div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0">
-<div style="font-size: 14px; font-weight: 700; color: ${REC_COLORS[rec.type]}">${REC_ICONS[rec.type]} Predlog: ${rec.title}</div>
-<div style="font-size: 12px; color: var(--text2)">${rec.reason}</div>
-<div style="font-size: 12px; color: var(--text2)">${rec.note ? 'Osnova' : 'Zadnjič'}: ${rec.last}</div>
-${rec.note ? `<div style="font-size: 12px; color: var(--mood)">${rec.note}</div>` : ''}
-${plateau && !plateau.cut ? `<a href="#/vaja?name=${encodeURIComponent(ex.name)}" style="font-size: 12px; font-weight: 600; color: var(--mood); text-decoration: none">Plato ${plateau.weeks} t. — poglej predloge →</a>` : ''}
-</div>
-<button type="button" data-action="applyRec" data-ei="${ei}" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--accent); color: var(--onAccent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0">Uporabi</button>
-</div>` : ''}
+${rec ? recCardHtml(rec, ei, ex, plateau, dpOffer) : dpOffer ? `<div style="margin: 0 4px"><button type="button" data-action="enableDp" data-ei="${ei}" style="border: 0; background: transparent; padding: 2px 0; color: var(--accentText); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer">Vklopi double progression (${dpOffer.sets || 3} × ${dpOffer.min}–${dpOffer.max})</button></div>` : ''}
 <div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) 64px 56px 44px; gap: 8px; padding: 0 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text2)">
 <div style="text-align: center">Ser.</div>
 <div>Prejšnje</div>
@@ -135,7 +188,7 @@ Počitek ${r.restBefore}
 </div>` : ''}
 <div style="${r.rowStyle}">
 <div style="text-align: center; font-size: 15px; font-weight: 700">${r.n}</div>
-<div style="font-size: 14px; color: var(--text2)">${r.prev}</div>
+<div style="font-size: 14px; color: var(--text2); min-width: 0">${r.prev}${r.label ? `<div style="font-size: 11px; font-weight: 600; color: var(--accentText)">${r.label}</div>` : ''}</div>
 <input type="text" inputmode="decimal" aria-label="Serija ${r.n}, teža v kg" data-field="kg" data-ei="${ei}" data-si="${r.si}" value="${r.s.kg}" placeholder="${r.kgHint}" style="height: 36px; width: 64px; box-sizing: border-box; border: 0; border-radius: 10px; background: var(--fill); text-align: center; font: inherit; font-size: 15px; font-weight: 600; color: var(--text); outline: none">
 <input type="text" inputmode="numeric" aria-label="Serija ${r.n}, ponovitve" data-field="reps" data-ei="${ei}" data-si="${r.si}" value="${r.s.reps}" placeholder="${r.repHint}" style="height: 36px; width: 56px; box-sizing: border-box; border: 0; border-radius: 10px; background: var(--fill); text-align: center; font: inherit; font-size: 15px; font-weight: 600; color: var(--text); outline: none">
 <button type="button" data-action="toggleSet" data-ei="${ei}" data-si="${r.si}" aria-label="Serija ${r.n}${r.s.done ? ' opravljena' : ' označi kot opravljeno'}" aria-pressed="${r.s.done}" style="${r.checkStyle}">
@@ -194,6 +247,7 @@ Dodaj vajo
 
 export function mount(root, ctx) {
   ensureActiveWorkout(ctx);
+  if (fitRows(store.data)) store.persist(store.data);
   root.style.paddingBottom = 'calc(96px + env(safe-area-inset-bottom, 0px) + 20px)';
   let timerInterval = null;
 
@@ -255,8 +309,8 @@ export function mount(root, ctx) {
     root.querySelectorAll('[data-action="applyRec"]').forEach(btn => {
       btn.addEventListener('click', () => {
         const ei = Number(btn.getAttribute('data-ei'));
-        const rec = recommend(store.data, store.data.activeWorkout.exercises[ei].name);
-        if (!rec) return;
+        const rec = recFor(store.data, store.data.activeWorkout.exercises[ei].name);
+        if (!rec || rec.blocked) return;
         const rows = rec.plan && rec.plan.length ? rec.plan : rec.reps.map(r => ({ kg: rec.kg, reps: r }));
         mutate(w => {
           const sets = w.exercises[ei].sets;
@@ -264,8 +318,13 @@ export function mount(root, ctx) {
           rows.forEach((row, i) => {
             if (sets[i].done) return;
             sets[i].kg = fmtKgInput(row.kg);
-            sets[i].reps = String(row.reps);
+            // Test attempts and sets to failure: the reps are what actually happened.
+            sets[i].reps = row.confirm ? '' : String(row.reps);
           });
+          // Prescribed exercises: drop leftover empty rows beyond the plan.
+          if (rec.program || (rec.rule && rec.rule.dp)) {
+            while (sets.length > rows.length && !sets[sets.length - 1].done && String(sets[sets.length - 1].reps).trim() === '') sets.pop();
+          }
         });
       });
     });
@@ -290,10 +349,17 @@ export function mount(root, ctx) {
         onPick: ({ name, muscle }) => {
           mutate(w => {
             w.exercises.push({ name, muscle, sets: [{ kg: '', reps: '', done: false }] });
+            fitRows(store.data);
           });
         }
       });
     });
+    root.querySelectorAll('[data-action="enableDp"]').forEach(btn => btn.addEventListener('click', () => {
+      const ex = store.data.activeWorkout.exercises[Number(btn.dataset.ei)];
+      setDp(store.data, ex.name, true);
+      fitRows(store.data);
+      store.save();
+    }));
     root.querySelector('[data-action="saveTemplate"]').addEventListener('click', () => {
       const w = store.data.activeWorkout;
       if (!w.exercises.length) return;
@@ -311,14 +377,16 @@ export function mount(root, ctx) {
       const w = store.data.activeWorkout;
       if (!w.exercises.length) { if (!confirm('Trening nima vaj. Vseeno končaj?')) return; }
       const durationMin = Math.max(1, Math.round((Date.now() - w.startedAt) / 60000));
-      store.data.workouts.push({
+      const saved = {
         id: w.id, dateISO: isoDate(new Date()), name: w.name || 'Trening',
         durationMin,
         exercises: w.exercises.map(ex => ({
           name: ex.name, muscle: ex.muscle || '',
           sets: ex.sets.filter(s => s.kg !== '' && s.reps !== '').map(s => ({ kg: parseFloat(String(s.kg).replace(',', '.')) || 0, reps: parseFloat(String(s.reps).replace(',', '.')) || 0, done: true }))
         })).filter(ex => ex.sets.length)
-      });
+      };
+      store.data.workouts.push(saved);
+      tagWorkout(store.data, saved);
       store.data.activeWorkout = null;
       lockRanges(store.data);
       store.save();

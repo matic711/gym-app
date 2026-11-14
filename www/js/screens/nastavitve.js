@@ -170,7 +170,9 @@ ${t.nutrition ? (() => {
 <span style="display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text2)">${s.morningTime || '07:30'}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></span>
 </button>
 ${switchRow('Jutranji vpis', 'Obvestilo vsako jutro, ponavlja se do vpisa', t.remindMorning, 'remindMorning', false)}
-${switchRow('Zakleni aplikacijo do vpisa', 'Brez jutranjega vpisa ne moreš naprej', t.morningGate, 'morningGate', false)}
+${switchRow('Jutranji alarm', 'Zvok, ki se ponavlja na 5–30 min in ga ne moreš odriniti, dokler ne vpišeš', t.morningAlarm, 'morningAlarm', false)}
+${switchRow('Zakleni aplikacijo do vpisa', 'Brez jutranjega vpisa (s težo) ne moreš naprej', t.morningGate, 'morningGate', false)}
+${switchRow('Gumb »Danes ne morem«', 'Preskok vpisa z razlogom, npr. ko nimaš tehtnice', t.morningSkip, 'morningSkip', false)}
 ${switchRow('Trening', 'Ob ' + (s.clock === '24 h' ? '18:00' : '6:00 PM') + ', ko zaostajaš za tedenskim ciljem', t.remindTraining, 'remindTraining', false)}
 ${switchRow('Tedensko poročilo', 'Nedelja ob ' + (s.clock === '24 h' ? '19:00' : '7:00 PM'), t.reportWeekly, 'reportWeekly', false)}
 ${switchRow('Mesečno poročilo', 'Zadnji dan v mesecu ob ' + (s.clock === '24 h' ? '19:00' : '7:00 PM'), t.reportMonthly, 'reportMonthly', false)}

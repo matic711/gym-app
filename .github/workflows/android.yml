@@ -77,6 +77,11 @@ jobs:
           # Google's ready-made barcode scanner UI (downloaded with the app via Play services)
           sed -i 's#</application>#    <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui"/>\n    </application>#' android/app/src/main/AndroidManifest.xml
           grep -q 'barcode_ui' android/app/src/main/AndroidManifest.xml
+          # Morning alarm: its sound, and exact timing (otherwise Android may delay it by minutes)
+          mkdir -p android/app/src/main/res/raw
+          cp android-res/raw/gym_alarm.wav android/app/src/main/res/raw/
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/>\n</manifest>#' android/app/src/main/AndroidManifest.xml
+          grep -q 'USE_EXACT_ALARM' android/app/src/main/AndroidManifest.xml
           npx cap sync android
 
       - name: Build APK

@@ -14,6 +14,7 @@ import * as forma from './screens/forma.js';
 import * as koledar from './screens/koledar.js';
 import * as porocilo from './screens/porocilo.js';
 import * as prehrana from './screens/prehrana.js';
+import * as eksperiment from './screens/eksperiment.js';
 
 const SCREENS = {
   home: { mod: domov, tab: 'home' },
@@ -28,7 +29,8 @@ const SCREENS = {
   nastavitve: { mod: nastavitve, tab: 'nastavitve' },
   uredi: { mod: urediTrening, tab: null },
   vaja: { mod: vaja, tab: 'analitika' },
-  forma: { mod: forma, tab: 'analitika' }
+  forma: { mod: forma, tab: 'analitika' },
+  eksperiment: { mod: eksperiment, tab: 'analitika' }
 };
 
 let currentUnmount = null;

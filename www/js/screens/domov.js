@@ -3,6 +3,7 @@ import { computeReminders, logStreak } from '../reminders.js';
 import { formReport } from '../analysis.js';
 import { pendingReport } from '../reports.js';
 import { nutritionEnabled, dayTotals, goalsOf } from '../nutrition.js';
+import { nextSession } from '../experiment.js';
 import { isoDate, addDays, startOfWeek, fromIso, fmtWeekday, fmtDate, fmtNum, fmtNum1, workoutVolume, workoutSetCount } from '../util.js';
 
 const MOOD_LABELS = ['Slabo', 'Meh', 'V redu', 'Dobro', 'Odlično'];
@@ -196,6 +197,19 @@ ${vm.report ? `
 </div>
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M9 6l6 6-6 6"></path></svg>
 </a>` : ''}
+
+${(() => {
+    const n = nextSession(store.data);
+    if (!n) return '';
+    return `<a href="#/eksperiment" style="background: var(--card); border-radius: 22px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); box-shadow: var(--shadow)">
+<div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accentText)">Bench eksperiment · teden ${n.week}/${n.weeks}</div>
+<div style="font-size: 15px; font-weight: 600">${n.blocked ? 'Ta teden opravljeno' : `Naslednji: ${n.sess.name}`}</div>
+<div style="font-size: 13px; color: var(--text2)">${n.prog.name} · ta teden ${n.thisWeek}/2</div>
+</div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--text2); flex-shrink: 0"><path d="M9 6l6 6-6 6"></path></svg>
+</a>`;
+  })()}
 
 ${vm.formWarning ? `
 <a href="#/forma" style="background: var(--card); border-radius: 22px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; text-decoration: none; color: var(--text); box-shadow: var(--shadow); border-left: 4px solid var(--danger)">

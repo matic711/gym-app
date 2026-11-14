@@ -153,7 +153,7 @@ function defaultSettings() {
       sound: true, vibe: true, prevValues: true,
       trackWeight: true, trackSleep: true, trackMood: true, trackEnergy: true, trackStress: true, trackWaist: false,
       remindMood: true, remindWeigh: false, remindTraining: true,
-      remindMorning: true, morningGate: true,
+      remindMorning: true, morningGate: true, morningAlarm: true, morningSkip: true,
       reportWeekly: true, reportMonthly: true,
       nutrition: false,
       autoBackup: true

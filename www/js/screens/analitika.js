@@ -6,6 +6,7 @@ import { detectPlateaus } from '../plateau.js';
 import { workingSets } from '../progression.js';
 import { recordsIn } from '../reports.js';
 import { lineChartHtml } from '../components/lineChart.js';
+import { experimentOf, nextSession } from '../experiment.js';
 
 const RANGES = [
   { key: 'week', label: 'Teden' },
@@ -333,6 +334,12 @@ ${vm.exercises.length > EX_PREVIEW ? `<button type="button" data-action="toggleE
 ${navTile(`#/porocilo?kind=${reportKind}`, 'Poročilo', reportKind === 'month' ? 'Ta mesec na kratko' : 'Ta teden na kratko', 'var(--text2)')}
 ${navTile('#/forma', 'Forma', vm.formTop ? vm.formTop.title : 'Premalo podatkov', formColor)}
 </div>
+${(() => {
+    const n = nextSession(store.data);
+    const ex = experimentOf(store.data);
+    const sub = n ? `${n.prog.name} · trening ${n.idx + 1}/${n.total}` : ex.history.length ? `${ex.history.length} ${ex.history.length === 1 ? 'program' : 'programi'} · izberi naslednjega` : 'Programi 2× na teden, primerjava napredka';
+    return navTile('#/eksperiment', 'Bench eksperiment', sub, 'var(--accentText)');
+  })()}
 
 ${strengthCard}
 ${trainingCard}

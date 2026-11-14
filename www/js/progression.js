@@ -45,7 +45,10 @@ export function ruleFor(data, name) {
   const custom = ((data.settings.progression || {})[name.trim().toLowerCase()]) || {};
   const rule = { ...defaultRule(name), ...custom, customRange: custom.min != null && custom.max != null && !custom.inferred, rangeLocked: !!custom.rangeLocked || (custom.min != null && custom.max != null) };
   if (custom.off === false && rule.kind === 'off') rule.kind = 'isolation';
-  return { ...rule, label: rule.off ? KIND_LABEL.off : KIND_LABEL[rule.kind] };
+  // Strict double progression (opt-in per exercise): a fixed number of working sets.
+  rule.dp = !!custom.dp && !rule.off;
+  rule.sets = Math.min(8, Math.max(1, Number(custom.sets) || 3));
+  return { ...rule, label: rule.off ? KIND_LABEL.off : rule.dp ? 'Double progression' : KIND_LABEL[rule.kind] };
 }
 
 const RANGE_PRESETS = {
@@ -104,6 +107,14 @@ export function lockRanges(data) {
     changed = true;
   }
   return changed;
+}
+
+// Turn strict double progression on or off for an exercise. Turning it on
+// fixes the current (possibly inferred) range so it doesn't drift.
+export function setDp(data, name, on) {
+  if (!on) { setRule(data, name, { dp: false }); return; }
+  const r = effectiveRule(data, name);
+  setRule(data, name, { dp: true, off: false, sets: r.sets || 3, min: r.min, max: r.max, inferred: false });
 }
 
 export function setRule(data, name, patch) {
@@ -166,7 +177,8 @@ export function recommend(data, name, now = new Date()) {
   const testDayNote = (session, prevSession) => {
     const ps = progressionSets(session, rule);
     const prevTop = prevSession ? progressionSets(prevSession, rule).top : 0;
-    if (ps.tests.length && (!ps.normal.length || (prevTop > 0 && ps.top < prevTop * 0.95))) {
+    const testTop = ps.tests.reduce((a, x) => Math.max(a, x.kg), 0);
+    if (ps.tests.length && (!ps.normal.length || ps.top < testTop * 0.8 || (prevTop > 0 && ps.top < prevTop * 0.95))) {
       const t = ps.tests.reduce((a, x) => (x.kg > a.kg ? x : a));
       return `${fmt(t.kg)} kg × ${t.reps} je bil test (težka serija), zato predlog izhaja iz zadnjega normalnega treninga.`;
     }
@@ -183,6 +195,26 @@ export function recommend(data, name, now = new Date()) {
     hist = hist.slice(0, -1);
   }
   const withNote = r => (r && testNote ? { ...r, note: r.note ? `${testNote} ${r.note}` : testNote } : r);
+
+  // Nothing but a test day to go on (e.g. only 100 × 3 logged so far): pick a
+  // weight that fits the rep range from the heavy sets.
+  if (testDayNote(hist[hist.length - 1], null)) {
+    const ps = progressionSets(hist[hist.length - 1], rule);
+    const t = ps.tests.reduce((a, x) => (x.kg * (1 + x.reps / 30) > a.kg * (1 + a.reps / 30) ? x : a));
+    if (!t.kg) return null;
+    const step = rule.step || 2.5;
+    let kg = floorTo(t.kg * (1 + t.reps / 30) / (1 + (rule.min + 2) / 30), step);
+    if (kg <= 0) kg = step;
+    const n = rule.dp ? rule.sets : 3;
+    const targets = Array(n).fill(rule.min);
+    return {
+      type: 'calib', kg, reps: targets, sets: n, rule, toGo: n * (rule.max - rule.min), nextKg: kg + step,
+      plan: targets.map(r => ({ kg, reps: r, working: true })),
+      title: rule.dp ? dpTitle(kg, targets) : `${fmt(kg)} kg × ${rule.min}–${rule.max}`,
+      reason: `Zadnjič samo težke serije (${fmt(t.kg)} kg × ${t.reps}) — za razpon ${rule.min}–${rule.max} je primerna teža ${fmt(kg)} kg.`,
+      last: `${fmt(t.kg)} kg × ${t.reps}`
+    };
+  }
 
   // A lighter-than-usual session (a bad day) shouldn't reset the baseline: when
   // the last working weight is at least 5 % under the session before it, suggest
@@ -231,31 +263,62 @@ function planFrom(session, top, workKg, targets, rule) {
     });
 }
 
+// "3 × 8 @ 82,5 kg", or "82,5 kg × 8, 8, 7" when the sets differ.
+function dpTitle(kg, targets) {
+  const w = kg ? `${fmt(kg)} kg` : 'lastna teža';
+  return targets.every(t => t === targets[0]) ? `${targets.length} × ${targets[0]} @ ${w}` : `${w} × ${targets.join(', ')}`;
+}
+
+// Double progression plan: the warm-ups from last time, then exactly the
+// prescribed working sets (no back-offs, no extra sets).
+function dpPlan(session, top, workKg, targets, rule) {
+  const base = planFrom(session, top, workKg, targets, rule);
+  const firstWork = base.findIndex(p => p.working);
+  const warm = firstWork > 0 ? base.slice(0, firstWork) : [];
+  return [...warm, ...targets.map(r => ({ kg: workKg, reps: r, working: true }))];
+}
+
 function suggestFrom(data, hist, rule, now) {
   const session = hist[hist.length - 1];
   const last = progressionSets(session, rule);
   if (!last.sets.length) return null;
-  const reps = last.sets.map(s => s.reps);
-  const n = reps.length;
+  const lastReps = last.sets.map(s => s.reps);
+  // Double progression works with a fixed number of sets: extra sets don't
+  // count, missing ones mean the top of the range isn't reached yet.
+  const n = rule.dp ? rule.sets : lastReps.length;
+  const missing = Math.max(0, n - lastReps.length);
+  const reps = rule.dp ? [...lastReps.slice(0, n), ...Array(missing).fill(lastReps[lastReps.length - 1])] : lastReps;
   const total = reps.reduce((a, b) => a + b, 0);
-  const lastText = `${last.top ? fmt(last.top) + ' kg' : 'lastna teža'} × ${reps.join(', ')}`;
+  const lastText = `${last.top ? fmt(last.top) + ' kg' : 'lastna teža'} × ${lastReps.join(', ')}`;
   const range = `${rule.min}–${rule.max}`;
   const kgLabel = kg => (kg ? fmt(kg) + ' kg' : 'lastna teža');
   const result = (type, kg, targets, title, reason) => {
-    const plan = planFrom(session, last.top, kg, targets, rule);
-    return { type, kg, reps: targets, sets: n, plan, rule, title, reason, last: lastText };
+    const plan = rule.dp ? dpPlan(session, last.top, kg, targets, rule) : planFrom(session, last.top, kg, targets, rule);
+    // Reps still missing before the weight goes up (all sets at the top of the range).
+    const toGo = type === 'up' || type === 'hold' ? 0 : Array.from({ length: n }, (_, i) => Math.max(0, topReps - (lastReps[i] || 0))).reduce((a, b) => a + b, 0);
+    return { type, kg, reps: targets, sets: n, plan, rule, title, reason, last: lastText, toGo, nextKg: last.top + rule.step };
   };
 
   // When the next weight step is big for this weight (light dumbbells, cables),
   // build more reps first so the jump doesn't crash the reps below the range.
   let topReps = rule.max, bridge = false;
-  if (last.top > 0) {
+  if (last.top > 0 && !rule.dp) {
     const next = last.top + rule.step;
     const need = Math.ceil(30 * ((next * (1 + (rule.min - 1) / 30)) / last.top - 1));
     if (need > rule.max) { topReps = Math.min(need, Math.round(rule.max * 1.6)); bridge = true; }
   }
+  // Double progression after a session far outside the range (100 × 3 when
+  // the range is 6–8, or 60 × 15): pick the weight that fits the range.
+  if (rule.dp && last.top > 0 && (lastReps[0] > rule.max + 2 || lastReps[0] < rule.min - 2)) {
+    const best = Math.max(...last.sets.map(s => s.kg * (1 + s.reps / 30)));
+    let kg = floorTo(best / (1 + (rule.min + 2) / 30), rule.step);
+    if (kg <= 0) kg = rule.step;
+    const targets = Array(n).fill(rule.min);
+    return { ...result('calib', kg, targets, dpTitle(kg, targets), `Zadnjič ${lastText} — za razpon ${range} je primerna teža ${fmt(kg)} kg. Začni pri ${rule.min} ponovitvah.`), toGo: n * (rule.max - rule.min) };
+  }
+
   // All working sets at the top — allowing the last one to be a rep short.
-  const atTop = reps.every(r => r >= topReps) || (n >= 3 && reps[0] >= topReps && total >= n * topReps - 1);
+  const atTop = missing === 0 && (reps.every(r => r >= topReps) || (!rule.dp && n >= 3 && reps[0] >= topReps && total >= n * topReps - 1));
   const isBelow = rs => rs.length > 0 && (rs[0] < rule.min || rs.reduce((a, b) => a + b, 0) / rs.length < rule.min - 1);
   const below = isBelow(reps);
 
@@ -268,7 +331,7 @@ function suggestFrom(data, hist, rule, now) {
       let kg = floorTo(last.top * 0.9, rule.step);
       if (kg >= last.top) kg = last.top - rule.step;
       if (kg > 0) {
-        return result('deload', kg, Array(n).fill(rule.max), `${fmt(kg)} kg × ${rule.max}`,
+        return result('deload', kg, Array(n).fill(rule.max), rule.dp ? dpTitle(kg, Array(n).fill(rule.max)) : `${fmt(kg)} kg × ${rule.max}`,
           `Dvakrat zapored pod ${rule.min} ponovitev pri ${fmt(last.top)} kg brez napredka — zmanjšaj na ${fmt(kg)} kg in gradi nazaj.`);
       }
     }
@@ -277,11 +340,11 @@ function suggestFrom(data, hist, rule, now) {
   if (atTop) {
     const readiness = poorReadiness(data, now);
     if (readiness) {
-      return result('hold', last.top, Array(n).fill(rule.max), `${kgLabel(last.top)} × ${rule.max}`,
+      return result('hold', last.top, Array(n).fill(rule.max), rule.dp ? dpTitle(last.top, Array(n).fill(rule.max)) : `${kgLabel(last.top)} × ${rule.max}`,
         `Zadnjič na vrhu razpona ${range}, a danes ${readiness} — drži težo, dvigni naslednjič.`);
     }
     const kg = last.top + rule.step;
-    return result('up', kg, Array(n).fill(rule.min), `${last.top ? '' : '+'}${fmt(kg)} kg${last.top ? '' : ' uteži'} × ${rule.min}–${rule.max}`,
+    return result('up', kg, Array(n).fill(rule.min), rule.dp ? dpTitle(kg, Array(n).fill(rule.min)) : `${last.top ? '' : '+'}${fmt(kg)} kg${last.top ? '' : ' uteži'} × ${rule.min}–${rule.max}`,
       last.top
         ? `Zadnjič ${bridge ? `${topReps}+ ponovitev` : `na vrhu razpona ${range}`} — dodaj ${fmt(rule.step)} kg.`
         : `Zadnjič vse serije na ${rule.max}+ — čas je za dodatno utež (${fmt(rule.step)} kg).`);
@@ -290,6 +353,14 @@ function suggestFrom(data, hist, rule, now) {
   // Under the range: one more rep per set (not straight to the bottom of the range — 4 → 6 is a lot).
   const target = reps.map(r => Math.min(topReps, r + 1));
   const pctStep = last.top ? Math.round(rule.step / last.top * 100) : 0;
+  if (rule.dp) {
+    return result('reps', last.top, target, dpTitle(last.top, target),
+      missing
+        ? `Zadnjič ${lastReps.length} od ${n} serij — danes naredi vse ${n}.`
+        : below
+          ? `Zadnjič pod ${rule.min} ponovitev — ista teža, ena ponovitev več na serijo.`
+          : `Ista teža. Ko narediš ${n} × ${rule.max}, dvigneš na ${fmt(last.top + rule.step)} kg.`);
+  }
   return result('reps', last.top, target, `${kgLabel(last.top)} × ${target.join(', ')}`,
     below
       ? `Zadnjič pod ${rule.min} ponovitev — ista teža, ponovitev več na serijo, dokler ne prideš na ${rule.min}.`

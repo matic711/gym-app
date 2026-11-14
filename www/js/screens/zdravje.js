@@ -1,5 +1,6 @@
 import { store } from '../state.js';
-import { isoDate, addDays, fmtDate } from '../util.js';
+import { isoDate, addDays, fmtDate, escapeHtml } from '../util.js';
+import { SKIP_REASONS, skipOf } from '../reminders.js';
 
 const MOOD_MOUTHS = ['M8 17a4.5 4.5 0 0 1 8 0', 'M8.5 16.5c1.2-1.2 5.8-1.2 7 0', 'M8.5 15.5h7', 'M8.5 14.5a4 4 0 0 0 7 0', 'M7.5 13.5a4.5 4.5 0 0 0 9 0z'];
 const MOOD_LABELS = ['Slabo', 'Meh', 'V redu', 'Dobro', 'Odlično'];
@@ -43,13 +44,21 @@ export function mount(root, ctx) {
     if (picked <= selectedDate) selectedDate = picked;
   }
   let draft = null;
+  let skipOpen = false;
+  let weightError = false;
+  const toggles = store.data.settings.toggles || {};
+  // In the morning the weight has to be typed in (no pre-filled yesterday's value).
+  const needWeight = gate && toggles.trackWeight !== false;
 
   function loadDraft() {
     const data = store.data;
     const iso = isoDate(selectedDate);
     const saved = data.wellness[iso];
     draft = saved ? { ...saved } : defaultsFor(data, iso);
+    if (needWeight && !saved) draft.weight = null;
   }
+  const lastWeight = () => findLastWeight(store.data, isoDate(addDays(selectedDate, 1)));
+  const fmtW = w => (w == null ? '—' : w.toFixed(1).replace('.', ','));
 
   function persist(force) {
     if (gate && !force) return;
@@ -69,10 +78,11 @@ export function mount(root, ctx) {
     if (dur < 0) dur += 1440;
 
     const wellnessDates = Object.keys(store.data.wellness).sort();
-    const startWeight = wellnessDates.length ? store.data.wellness[wellnessDates[0]].weight : draft.weight;
+    const startWeight = (wellnessDates.length ? store.data.wellness[wellnessDates[0]].weight : draft.weight) ?? lastWeight();
     const goalWeight = store.data.settings.goalWeightKg;
     const span = startWeight - goalWeight;
-    const progressPct = span > 0 ? Math.max(0, Math.min(100, Math.round(((startWeight - draft.weight) / span) * 100))) : 0;
+    const progressPct = span > 0 && draft.weight != null ? Math.max(0, Math.min(100, Math.round(((startWeight - draft.weight) / span) * 100))) : 0;
+    const skip = skipOf(store.data, iso);
 
     const qualityHtml = [1, 2, 3, 4, 5].map(n => {
       const on = n === draft.quality;
@@ -114,12 +124,19 @@ ${gate ? `
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"></rect><path d="M8.5 10.5a3.5 3.5 0 0 1 7 0M12 10.5l1.5-2"></path></svg>
 Teža
 </h2>
-<div style="font-size: 13px; color: var(--text2)">${yesterdayEntry ? `včeraj ${yesterdayEntry.weight.toFixed(1).replace('.', ',')} kg` : 'ni podatka za včeraj'}</div>
+<div style="font-size: 13px; color: var(--text2)">${yesterdayEntry && yesterdayEntry.weight != null ? `včeraj ${fmtW(yesterdayEntry.weight)} kg` : 'ni podatka za včeraj'}</div>
 </div>
-<div style="display: flex; align-items: center; justify-content: space-between">
+${needWeight ? `<label style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; color: ${weightError ? 'var(--danger)' : 'var(--text2)'}; font-weight: ${weightError ? 600 : 400}">${weightError ? 'Najprej se stehtaj in vpiši težo.' : 'Stehtaj se in vpiši današnjo težo (obvezno).'}</span>
+<div style="display: flex; align-items: center; gap: 8px; background: var(--fill); border-radius: 14px; padding: 0 14px; ${weightError ? 'box-shadow: inset 0 0 0 2px var(--danger);' : ''}">
+<input type="text" inputmode="decimal" data-action="wInput" value="${draft.weight != null ? fmtW(draft.weight) : ''}" placeholder="npr. ${fmtW(lastWeight())}" aria-label="Današnja teža v kg" style="flex-grow: 1; min-width: 0; height: 56px; border: 0; background: transparent; font: inherit; font-size: 32px; font-weight: 700; color: var(--text); outline: none">
+<span style="font-size: 18px; font-weight: 500; color: var(--text2)">kg</span>
+</div>
+</label>` : ''}
+<div style="display: ${needWeight ? 'none' : 'flex'}; align-items: center; justify-content: space-between">
 <button type="button" aria-label="Zmanjšaj težo" data-action="wDown" style="width: 48px; height: 48px; border: 0; border-radius: 24px; background: var(--fill); color: var(--text); font-size: 24px; font-weight: 500; cursor: pointer">−</button>
 <div style="display: flex; align-items: baseline; gap: 6px">
-<button type="button" data-action="wEdit" aria-label="Vpiši težo" style="border: 0; background: transparent; padding: 0; font: inherit; font-size: 44px; font-weight: 700; letter-spacing: -0.03em; color: var(--text); cursor: pointer">${draft.weight.toFixed(1).replace('.', ',')}</button>
+<button type="button" data-action="wEdit" aria-label="Vpiši težo" style="border: 0; background: transparent; padding: 0; font: inherit; font-size: 44px; font-weight: 700; letter-spacing: -0.03em; color: var(--text); cursor: pointer">${fmtW(draft.weight)}</button>
 <span style="font-size: 18px; font-weight: 500; color: var(--text2)">kg</span>
 </div>
 <button type="button" aria-label="Povečaj težo" data-action="wUp" style="width: 48px; height: 48px; border: 0; border-radius: 24px; background: var(--fill); color: var(--text); font-size: 24px; font-weight: 500; cursor: pointer">+</button>
@@ -186,6 +203,14 @@ Kako se počutiš?
 </section>
 
 <button type="button" data-action="save" style="height: 54px; border: 0; border-radius: 16px; background: var(--accent); color: var(--onAccent); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer">${gate ? 'Shrani in nadaljuj' : 'Shrani vnos'}</button>
+${gate && toggles.morningSkip !== false ? (skipOpen ? `
+<section style="background: var(--card); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow)">
+<div style="font-size: 15px; font-weight: 600">Zakaj danes ne moreš?</div>
+<div style="font-size: 13px; color: var(--text2)">Dan se zabeleži kot preskočen, alarm za danes utihne. Niz vpisov se prekine.</div>
+${SKIP_REASONS.map((r, i) => `<button type="button" data-skip="${i}" style="height: 46px; border: 0; border-radius: 12px; background: var(--fill); color: var(--text); font: inherit; font-size: 15px; font-weight: 600; text-align: left; padding: 0 14px; cursor: pointer">${r}</button>`).join('')}
+<button type="button" data-action="skipCancel" style="height: 40px; border: 0; background: transparent; color: var(--accentText); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">Prekliči — bom vpisal</button>
+</section>` : `<button type="button" data-action="skipOpen" style="height: 44px; border: 0; background: transparent; color: var(--text2); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Danes ne morem</button>`) : ''}
+${!gate && skip ? `<div style="font-size: 13px; color: var(--text2); text-align: center">Jutranji vpis preskočen: ${escapeHtml(skip.reason)}</div>` : ''}
 </main>`;
 
     wire();
@@ -203,13 +228,32 @@ Kako se počutiš?
       loadDraft();
       render();
     });
-    root.querySelector('[data-action="wDown"]').addEventListener('click', () => { draft.weight = Math.round((draft.weight - 0.1) * 10) / 10; persist(); render(); });
+    root.querySelector('[data-action="wDown"]').addEventListener('click', () => { draft.weight = Math.round(((draft.weight ?? lastWeight()) - 0.1) * 10) / 10; persist(); render(); });
+    // No re-render while typing: it would swallow the tap on "Shrani".
+    root.querySelector('[data-action="wInput"]')?.addEventListener('input', (e) => {
+      const num = parseFloat(String(e.target.value).replace(',', '.'));
+      draft.weight = num > 20 && num < 400 ? Math.round(num * 10) / 10 : null;
+    });
+    root.querySelector('[data-action="skipOpen"]')?.addEventListener('click', () => { skipOpen = true; render(); });
+    root.querySelector('[data-action="skipCancel"]')?.addEventListener('click', () => { skipOpen = false; render(); });
+    root.querySelectorAll('[data-skip]').forEach(b => b.addEventListener('click', () => {
+      let reason = SKIP_REASONS[Number(b.dataset.skip)];
+      if (reason === 'Drugo') {
+        const txt = prompt('Razlog (neobvezno):', '');
+        if (txt === null) return;
+        if (txt.trim()) reason = txt.trim().slice(0, 80);
+      }
+      store.data.wellnessSkips = store.data.wellnessSkips || {};
+      store.data.wellnessSkips[isoDate(selectedDate)] = { reason, at: Date.now() };
+      store.save();
+      ctx.refresh();
+    }));
     root.querySelector('[data-action="wEdit"]').addEventListener('click', () => {
-      const val = prompt('Teža (kg):', draft.weight.toFixed(1).replace('.', ','));
+      const val = prompt('Teža (kg):', fmtW(draft.weight ?? lastWeight()));
       const num = parseFloat(String(val || '').replace(',', '.'));
       if (val != null && num > 20 && num < 400) { draft.weight = Math.round(num * 10) / 10; persist(); render(); }
     });
-    root.querySelector('[data-action="wUp"]').addEventListener('click', () => { draft.weight = Math.round((draft.weight + 0.1) * 10) / 10; persist(); render(); });
+    root.querySelector('[data-action="wUp"]').addEventListener('click', () => { draft.weight = Math.round(((draft.weight ?? lastWeight()) + 0.1) * 10) / 10; persist(); render(); });
     root.querySelector('[data-action="bed"]').addEventListener('change', (e) => { draft.bed = e.target.value; persist(); render(); });
     root.querySelector('[data-action="wake"]').addEventListener('change', (e) => { draft.wake = e.target.value; persist(); render(); });
     root.querySelectorAll('[data-action="quality"]').forEach(btn => btn.addEventListener('click', () => { draft.quality = Number(btn.getAttribute('data-v')); persist(); render(); }));
@@ -218,6 +262,19 @@ Kako se počutiš?
     root.querySelector('[data-action="stress"]').addEventListener('change', (e) => { draft.stress = Number(e.target.value); persist(); render(); });
     root.querySelector('[data-action="note"]').addEventListener('change', (e) => { draft.note = e.target.value; persist(); });
     root.querySelector('[data-action="save"]').addEventListener('click', () => {
+      const wIn = root.querySelector('[data-action="wInput"]');
+      if (wIn) {
+        const num = parseFloat(String(wIn.value).replace(',', '.'));
+        draft.weight = num > 20 && num < 400 ? Math.round(num * 10) / 10 : null;
+      }
+      if (needWeight && draft.weight == null) {
+        weightError = true;
+        render();
+        root.querySelector('[data-action="wInput"]')?.focus();
+        window.scrollTo(0, 0);
+        return;
+      }
+      if (store.data.wellnessSkips) delete store.data.wellnessSkips[isoDate(selectedDate)];
       persist(true);
       if (gate) ctx.refresh();
       else if (ctx.params.from === 'koledar') ctx.navigate('koledar', { date: isoDate(selectedDate) });

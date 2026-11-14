@@ -2,32 +2,46 @@ import { store } from '../state.js';
 import { fromIso, fmtDate, fmtDateShort, fmtNum, fmtNum1, escapeHtml } from '../util.js';
 import { exerciseHistory } from '../stats.js';
 import { lineChartHtml } from '../components/lineChart.js';
-import { recommend, ruleFor, effectiveRule, setRule } from '../progression.js';
+import { recommend, ruleFor, effectiveRule, setRule, setDp } from '../progression.js';
+import { isBench, experimentOf } from '../experiment.js';
 import { plateauFor } from '../plateau.js';
 
 function progressionHtml(name) {
   const rule = effectiveRule(store.data, name);
+  const exp = isBench(name) ? experimentOf(store.data) : null;
   const rec = rule.off ? null : recommend(store.data, name);
   const step = String(rule.step).replace('.', ',');
-  const btn = (action, label) => `<button type="button" data-action="${action}" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--fill); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">${label}</button>`;
+  const btn = (action, label, primary) => `<button type="button" data-action="${action}" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: ${primary ? 'var(--accent)' : 'var(--fill)'}; color: ${primary ? 'var(--onAccent)' : 'var(--text)'}; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">${label}</button>`;
+  const mode = rule.off ? 'off' : rule.dp ? 'dp' : 'auto';
+  const seg = [['off', 'Izklopljeno'], ['auto', 'Predlog'], ['dp', 'Double progression']].map(([m, label]) => {
+    const on = m === mode;
+    return `<button type="button" role="tab" aria-selected="${on}" data-mode="${m}" style="height: 34px; border: 0; border-radius: 9px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ${on ? 'background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08);' : 'background: transparent; color: var(--text2);'}">${label}</button>`;
+  }).join('');
+  const recBox = rec ? `<div style="background: var(--fill); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 12px; color: var(--text2)">Naslednji trening</span>
+<span style="font-size: 16px; font-weight: 700">${rec.title}</span>
+${rule.dp && rec.type === 'up' ? `<span style="font-size: 13px; font-weight: 700; color: var(--good)">Dvigni težo: +${step} kg</span>` : ''}
+${rule.dp && rec.type !== 'up' && rec.toGo > 0 && rec.type !== 'calib' ? `<span style="font-size: 13px; color: var(--text)">Do ${String(rec.nextKg).replace('.', ',')} kg manjka še ${rec.toGo} pon.</span>` : ''}
+<span style="font-size: 12px; color: var(--text2)">${rec.reason}</span>
+${rec.note ? `<span style="font-size: 12px; color: var(--mood)">${rec.note}</span>` : ''}
+</div>` : `<div style="font-size: 13px; color: var(--text2)">${rule.dp ? `Prvi trening: izberi težo, s katero narediš ${rule.sets} × ${rule.min}–${rule.min + 2}. Od tam naprej aplikacija pove vse.` : 'Predlog se pokaže, ko vajo prvič zabeležiš.'}</div>`;
   return `<section style="background: var(--card); border-radius: 22px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow)">
 <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px">
 <h2 style="margin: 0; font-size: 15px; font-weight: 600">Napredovanje</h2>
 <span style="font-size: 12px; color: var(--text2)">${rule.label}</span>
 </div>
-${rule.off
-    ? '<div style="font-size: 14px; color: var(--text2)">Predlogi za to vajo so izklopljeni.</div>'
-    : `<div style="font-size: 14px">Double progression: ${rule.min}–${rule.max} ponovitev, nato +${step} kg.${rule.inferred ? ' <span style="color: var(--text2)">Razpon je določen iz tvojih treningov.</span>' : ''}</div>
-${rec ? `<div style="background: var(--fill); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px">
-<span style="font-size: 12px; color: var(--text2)">Naslednjič</span>
-<span style="font-size: 16px; font-weight: 700">${rec.title}</span>
-<span style="font-size: 12px; color: var(--text2)">${rec.reason}</span>
-${rec.note ? `<span style="font-size: 12px; color: var(--mood)">${rec.note}</span>` : ''}
-</div>` : '<div style="font-size: 13px; color: var(--text2)">Predlog se pokaže, ko vajo prvič zabeležiš.</div>'}`}
-<div style="display: flex; gap: 8px; flex-wrap: wrap">
-${rule.off ? '' : btn('editRange', `Razpon ${rule.min}–${rule.max}`) + btn('editStep', `Korak ${step} kg`)}
-${btn('toggleProgression', rule.off ? 'Vklopi predloge' : 'Izklopi')}
-</div>
+${exp ? `<a href="#/eksperiment" style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--accentSoft); text-decoration: none; color: var(--text)">
+<span style="font-size: 14px; font-weight: 700; color: var(--accentText)">Bench eksperiment ›</span>
+<span style="font-size: 12px; color: var(--text2)">${exp.active ? 'Program teče — na treningu bench predpiše program, ne spodnja nastavitev.' : 'Programi 2× na teden in primerjava, koliko kateri prinese.'}</span>
+</a>` : ''}
+<div role="tablist" style="display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 2px; padding: 2px; border-radius: 11px; background: var(--fill)">${seg}</div>
+${mode === 'off' ? '<div style="font-size: 14px; color: var(--text2)">Predlogi za to vajo so izklopljeni.</div>'
+    : mode === 'dp' ? `<div style="font-size: 14px">Vsak trening <b>${rule.sets} ${rule.sets === 1 ? 'serija' : rule.sets === 2 ? 'seriji' : rule.sets <= 4 ? 'serije' : 'serij'}</b> po <b>${rule.min}–${rule.max}</b> ponovitev z isto težo. Ko so vse serije na ${rule.max}, +${step} kg in spet od ${rule.min}.</div>`
+      : `<div style="font-size: 14px">Samodejni predlog iz zadnjega treninga (${rule.min}–${rule.max} ponovitev, nato +${step} kg).${rule.inferred ? ' <span style="color: var(--text2)">Razpon je določen iz tvojih treningov.</span>' : ''}</div>`}
+${mode === 'off' ? '' : recBox}
+${mode === 'off' ? '' : `<div style="display: flex; gap: 8px; flex-wrap: wrap">
+${mode === 'dp' ? btn('editSets', `Serije ${rule.sets}`) : ''}${btn('editRange', `Razpon ${rule.min}–${rule.max}`)}${btn('editStep', `Korak ${step} kg`)}
+</div>`}
 </section>`;
 }
 
@@ -206,10 +220,18 @@ export function mount(root, ctx) {
       const num = parseFloat(String(val || '').replace(',', '.'));
       if (num > 0 && num <= 50) { setRule(store.data, name, { step: num }); store.save(); }
     });
-    root.querySelector('[data-action="toggleProgression"]').addEventListener('click', () => {
-      setRule(store.data, name, { off: !ruleFor(store.data, name).off });
-      store.save();
+    root.querySelector('[data-action="editSets"]')?.addEventListener('click', () => {
+      const val = prompt('Število delovnih serij (1–8):', String(ruleFor(store.data, name).sets));
+      const n = parseInt(val || '', 10);
+      if (n >= 1 && n <= 8) { setRule(store.data, name, { sets: n }); store.save(); }
     });
+    root.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+      const m = b.dataset.mode;
+      if (m === 'off') setRule(store.data, name, { off: true, dp: false });
+      else if (m === 'auto') { setRule(store.data, name, { off: false }); setDp(store.data, name, false); }
+      else { setRule(store.data, name, { off: false }); setDp(store.data, name, true); }
+      store.save();
+    }));
   }
   render();
   return store.subscribe(render);

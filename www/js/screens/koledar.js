@@ -66,8 +66,9 @@ ${action}
 
   if (!e) {
     if (iso > todayIso) return card(head('') + '<div style="font-size: 14px; color: var(--text2)">Ta dan še ni prišel.</div>');
+    const skip = (store.data.wellnessSkips || {})[iso];
     return card(head(`<a href="${editHref}" style="height: 36px; padding: 0 14px; border-radius: 18px; background: var(--accent); color: var(--onAccent); display: flex; align-items: center; text-decoration: none; font-size: 14px; font-weight: 600">Vpiši</a>`) +
-      '<div style="font-size: 14px; color: var(--text2)">Ta dan ni vpisa.</div>');
+      `<div style="font-size: 14px; color: var(--text2)">${skip ? `Vpis preskočen: ${escapeHtml(skip.reason)}` : 'Ta dan ni vpisa.'}</div>`);
   }
   const sleep = sleepMinutes(e);
   return card(head(`<a href="${editHref}" style="font-size: 15px; font-weight: 600; color: var(--accentText); text-decoration: none; padding: 6px 0">Uredi</a>`) + `

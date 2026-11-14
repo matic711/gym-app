@@ -113,6 +113,7 @@ export function mount(root, ctx) {
     const durationMin = Math.round(toNum(draft.durationMin));
     const exercises = draft.exercises.map(ex => ({
       name: ex.name, muscle: ex.muscle || '',
+      ...(ex.program ? { program: ex.program } : {}),
       sets: ex.sets
         .filter(s => String(s.kg).trim() !== '' && String(s.reps).trim() !== '')
         .map(s => ({ kg: toNum(s.kg) || 0, reps: toNum(s.reps) || 0, done: true }))
