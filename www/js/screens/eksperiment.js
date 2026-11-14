@@ -41,7 +41,7 @@ function activeHtml(data, n, showAll) {
     const p = sessionPlan(data, active, i);
     return `<div style="display: flex; gap: 10px; align-items: baseline; padding: 6px 0; ${i ? 'border-top: 1px solid var(--line);' : ''} ${i === n.idx ? 'font-weight: 700;' : ''}">
 <span style="width: 44px; flex-shrink: 0; font-size: 12px; color: var(--text2)">${Math.floor(i / PER_WEEK) + 1}. teden</span>
-<span style="flex-grow: 1; min-width: 0; font-size: 14px">${escapeHtml(s.name)}<br><span style="font-size: 12px; color: var(--text2); font-weight: 400">${s.dp && i > n.idx ? 'teža po double progression' : p.title}</span></span>
+<span style="flex-grow: 1; min-width: 0; font-size: 14px">${escapeHtml(s.name)}<br><span style="font-size: 12px; color: var(--text2); font-weight: 400">${(s.dp || s.rule) && i > n.idx ? 'teža glede na tvoje rezultate' : p.title}</span></span>
 <span style="font-size: 12px; flex-shrink: 0; color: ${d ? 'var(--good)' : 'var(--text2)'}">${d ? fmtDateShort(fromIso(d.workout.dateISO)) : i === n.idx ? 'naslednji' : ''}</span>
 </div>`;
   }).join('');
@@ -73,15 +73,17 @@ function pickHtml(data) {
   const doneKeys = new Set(ex.history.filter(h => !h.stopped).map(h => h.key));
   return card(`${h2('Izberi program')}
 ${small(`Vsi programi: bench ${PER_WEEK}× na teden. Teže so izračunane iz tvojega 1RM (${fmtKg(ex.oneRm)} kg).`)}
-${PROGRAMS.map(p => `<div style="border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 6px">
+${[['known', 'Znani programi'], ['method', 'Splošne metode']].map(([g, label]) => `<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text2); padding-top: 4px">${label}</div>
+${PROGRAMS.filter(p => p.group === g).map(p => `<div style="border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 6px">
 <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
 <span style="font-size: 16px; font-weight: 700">${escapeHtml(p.name)}</span>
 <span style="font-size: 12px; color: var(--text2); flex-shrink: 0">${p.weeks} tednov${doneKeys.has(p.key) ? ' · opravljen' : ''}</span>
 </div>
+${p.origin ? small(escapeHtml(p.origin), 'var(--accentText)') : ''}
 ${small(p.desc)}
 ${small(`${testLabel(p)}${p.test === 'reps' ? ` (${fmtKg(repsTestKg(ex.oneRm))} kg)` : ''}`, 'var(--text)')}
 <div>${btn('start', p.key === next.key ? 'Začni (predlagan naslednji)' : 'Začni', p.key === next.key, `data-key="${p.key}"`)}</div>
-</div>`).join('')}`);
+</div>`).join('')}`).join('')}`);
 }
 
 function resultsHtml(data) {

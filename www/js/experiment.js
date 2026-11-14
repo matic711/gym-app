@@ -83,16 +83,69 @@ function paused() {
   return s;
 }
 
+// Sheiko-style bench: lots of sets of 2–5 reps at 70–85 %, pyramids, rarely
+// above 90 %. The 50–60 % sets are part of the program (its own warm-up).
+function sheiko() {
+  const W = (p, r, sets = 1) => B(sets, r, p, { warm: p <= 60 });
+  const weeks = [
+    [[W(50, 5), W(60, 4), W(70, 3, 2), W(75, 3, 5)], [W(50, 6), W(60, 6), W(70, 6, 4)]],
+    [[W(50, 5), W(60, 4), W(70, 3), W(80, 2, 5)], [W(50, 5), W(60, 5), W(70, 4, 5)]],
+    [[W(50, 5), W(60, 4), W(70, 3), W(80, 3, 2), W(85, 2, 3), W(80, 3, 2)], [W(55, 5), W(65, 5), W(75, 4, 4)]],
+    [[W(50, 5), W(60, 4), W(70, 3, 2), W(75, 3, 4)], [W(50, 6), W(60, 6), W(65, 6, 3)]],
+    [[W(50, 3), W(60, 3), W(70, 3), W(80, 2), W(85, 2, 4)], [W(50, 5), W(60, 4), W(70, 3, 2), W(75, 3, 4)]],
+    [[W(50, 3), W(60, 3), W(70, 3), W(80, 2), W(90, 1, 3), W(85, 2, 2)], [W(50, 5), W(60, 5), W(70, 4, 4)]],
+    [[W(50, 3), W(60, 3), W(70, 3), W(80, 2, 2), W(85, 2, 3)], [W(50, 5), W(60, 4), W(70, 3, 3)]],
+    [[W(50, 3), W(60, 3), W(70, 3, 2), W(75, 2, 3)], null]
+  ];
+  const s = [];
+  weeks.forEach(([a, b], w) => {
+    const phase = w < 4 ? 'Pripravljalna faza' : 'Tekmovalna faza';
+    s.push({ key: 'A', name: `${phase} · težji dan`, blocks: a });
+    s.push(b ? { key: 'B', name: `${phase} · volumen`, blocks: b } : { key: 'T', name: 'Test 1RM', test: '1rm' });
+  });
+  return s;
+}
+
+// GZCLP: T1 bench 5 × 3+ and T2 bench 3 × 10, progression from the results.
+function gzclp() {
+  const s = [];
+  for (let w = 0; w < 8; w++) {
+    s.push({ key: 'A', name: 'T1 (težko)', rule: 'gzT1' });
+    s.push(w === 7 ? { key: 'T', name: 'Test 1RM', test: '1rm' } : { key: 'B', name: 'T2 (volumen)', rule: 'gzT2' });
+  }
+  return s;
+}
+
+// Texas Method, two days: volume 5 × 5 at 90 %, intensity 1 × 5 at a new best.
+function texas() {
+  const s = [];
+  for (let w = 0; w < 8; w++) {
+    s.push({ key: 'V', name: 'Dan volumna', rule: 'txV' });
+    s.push(w === 7 ? { key: 'T', name: 'Test 1RM', test: '1rm' } : { key: 'I', name: 'Dan intenzivnosti', rule: 'txI' });
+  }
+  return s;
+}
+
 export const PROGRAMS = [
-  { key: 'linear', name: 'Linearna periodizacija', weeks: 8, test: '1rm', build: linear,
+  { key: 'sheiko', group: 'known', name: 'Sheiko', weeks: 8, test: '1rm', build: sheiko,
+    origin: 'Boris Šejko · samo bench del, prilagojen na 2× na teden (original ima bench 3× ter počep in mrtvi dvig)',
+    desc: 'Veliko serij po 2–5 ponovitev pri 70–85 %, piramide, redko nad 90 % — tehnika in volumen brez odpovedi. 4 tedne pripravljalne in 4 tedne tekmovalne faze, na koncu test 1RM.' },
+  { key: '531', group: 'known', name: '5/3/1 Boring But Big', weeks: 9, test: 'reps', build: wendler,
+    origin: 'Jim Wendler · glavni dan 5/3/1 in dan 5 × 10 (BBB) kot drugi bench dan',
+    desc: 'Glavni dan 5/3/1 z zadnjo serijo do odpovedi (+), drugi dan 5 × 10 pri 50–60 %. Teže iz trening maksa (90 % 1RM), drugi cikel +2,5 kg. Test: ponovitve pri isti teži na začetku in na koncu.' },
+  { key: 'gzclp', group: 'known', name: 'GZCLP', weeks: 8, test: '1rm', build: gzclp,
+    origin: 'Cody Lefever (GZCL) · T1 in T2 bench',
+    desc: 'T1: 5 × 3+ in vsakič +2,5 kg; ko ne gre, 6 × 2+, nato 10 × 1+, potem nov začetek. T2: 3 × 10 → 3 × 8 → 3 × 6. Teže se prilagajajo tvojim rezultatom. Na koncu test 1RM.' },
+  { key: 'texas', group: 'known', name: 'Texas Method', weeks: 8, test: '1rm', build: texas,
+    origin: 'Mark Rippetoe / Glenn Pendlay · 2-dnevna različica (brez dneva za regeneracijo)',
+    desc: 'Dan volumna 5 × 5 pri 90 % teže dneva intenzivnosti, dan intenzivnosti 1 × 5 z novim rekordom — vsak teden +2,5 kg. Če 5 ne gre, ostaneš na isti teži. Na koncu test 1RM.' },
+  { key: 'linear', group: 'method', name: 'Linearna periodizacija', weeks: 8, test: '1rm', build: linear,
     desc: 'Od hipertrofije (4 × 8) prek moči (5 × 5) do vrha (5 × 3). Klasika: vsak teden malo težje, na koncu test 1RM.' },
-  { key: '531', name: '5/3/1 (2 cikla)', weeks: 9, test: 'reps', build: wendler,
-    desc: 'Glavni dan 5/3/1 z zadnjo serijo do odpovedi (+), drugi dan 5 × 10. Test: ponovitve pri isti teži na začetku in na koncu.' },
-  { key: 'dup', name: 'DUP: težko + volumen', weeks: 6, test: '1rm', build: dup,
+  { key: 'dup', group: 'method', name: 'DUP: težko + volumen', weeks: 6, test: '1rm', build: dup,
     desc: 'En dan težke trojke in dvojke (80–92,5 %), drugi dan volumen (4 × 8 → 3 × 5). Na koncu test 1RM.' },
-  { key: 'dp', name: 'Double progression', weeks: 7, test: 'reps', build: doubleProg,
+  { key: 'dp', group: 'method', name: 'Double progression', weeks: 7, test: 'reps', build: doubleProg,
     desc: 'En dan 3 × 6–8, drugi 3 × 10–12. Ko narediš vse serije na vrhu razpona, +2,5 kg. Test: ponovitve pri isti teži.' },
-  { key: 'pause', name: 'Pavzirani bench + tempo', weeks: 6, test: '1rm', build: paused,
+  { key: 'pause', group: 'method', name: 'Pavzirani bench + tempo', weeks: 6, test: '1rm', build: paused,
     desc: 'Pavza 2 s na prsih (moč iz spodnjega dela) in počasen spust (kontrola). Na koncu test 1RM z običajnim benchem.' }
 ];
 
@@ -159,6 +212,87 @@ function dpTargets(data, active, idx, sess) {
   return { kg, reps: reps.map(r => Math.max(min, Math.min(max, r + 1))), why: `Zadnjič ${fmtKg(kg)} kg × ${reps.filter(Boolean).join(', ')} — ista teža, ponovitev več.` };
 }
 
+// Earlier sessions of the same kind in this program, oldest first.
+function prevSame(data, active, idx, key) {
+  const all = programByKey(active.key).build();
+  return doneSessions(data, active.id).filter(d => d.idx < idx && all[d.idx] && all[d.idx].key === key);
+}
+
+const fiveRm = basis => basis / (1 + 5 / 30);
+const repsAtLeast = (ex, kg) => setsOf(ex).filter(s => s.kg >= kg - 0.01);
+
+// Working sets with the last one "+" (as many as possible, typed in).
+function amrapRows(kg, sets, reps) {
+  return Array.from({ length: sets }, (_, i) => (i === sets - 1
+    ? { kg, reps, working: true, label: `${reps}+ (do odpovedi)`, amrap: true, confirm: true }
+    : { kg, reps, working: true }));
+}
+
+const RULES = {
+  // GZCLP T1: 5 × 3+ → 6 × 2+ → 10 × 1+ at the same weight on a miss; then
+  // start again at 85 %. Many reps on the last set → bigger jump.
+  gzT1(data, active, idx) {
+    const SCH = [[5, 3], [6, 2], [10, 1]];
+    let kg = f25(fiveRm(active.basis) * 0.85), st = 0, why = 'Začetek: približno 85 % tvojega 5RM.';
+    for (const d of prevSame(data, active, idx, 'A')) {
+      const [n, r] = SCH[st];
+      const sets = repsAtLeast(d.ex, kg);
+      const total = sets.reduce((a, x) => a + x.reps, 0);
+      const last = sets.length ? sets[sets.length - 1].reps : 0;
+      if (total >= n * r) {
+        const add = st === 0 && last >= 10 ? 5 : 2.5;
+        why = `Zadnjič ${n} × ${r}+ uspešno${add > 2.5 ? ` (zadnja serija ${last})` : ''} — +${fmtKg(add)} kg.`;
+        kg += add;
+      } else if (st < 2) {
+        why = `Zadnjič ${n} × ${r} ni šlo (${total}/${n * r}) — ista teža, ${SCH[st + 1][0]} × ${SCH[st + 1][1]}+.`;
+        st++;
+      } else {
+        const k = f25(kg * 0.85);
+        why = `10 × 1 ni šlo — nov začetek: 5 × 3+ pri ${fmtKg(k)} kg.`;
+        kg = k; st = 0;
+      }
+    }
+    const [n, r] = SCH[st];
+    return { rows: amrapRows(kg, n, r), title: `${n} × ${r}+ @ ${fmtKg(kg)} kg`, desc: `${why} Zadnja serija do odpovedi — vpiši, koliko si jih naredil.` };
+  },
+  // GZCLP T2: 3 × 10 → 3 × 8 → 3 × 6 at the same weight on a miss; then 3 × 10
+  // again, a bit heavier than the last 3 × 10 start.
+  gzT2(data, active, idx) {
+    const SCH = [[3, 10], [3, 8], [3, 6]];
+    let kg = f25(active.basis * 0.6), start = kg, st = 0, why = 'Začetek: približno 60 % 1RM.';
+    for (const d of prevSame(data, active, idx, 'B')) {
+      const [n, r] = SCH[st];
+      const total = repsAtLeast(d.ex, kg).reduce((a, x) => a + x.reps, 0);
+      if (total >= n * r) { why = `Zadnjič ${n} × ${r} uspešno — +2,5 kg.`; kg += 2.5; }
+      else if (st < 2) { why = `Zadnjič ${n} × ${r} ni šlo — ista teža, ${SCH[st + 1][0]} × ${SCH[st + 1][1]}.`; st++; }
+      else { start += 2.5; why = `3 × 6 ni šlo — spet 3 × 10 pri ${fmtKg(start)} kg.`; kg = start; st = 0; }
+    }
+    const [n, r] = SCH[st];
+    return { rows: Array.from({ length: n }, () => ({ kg, reps: r, working: true })), title: `${n} × ${r} @ ${fmtKg(kg)} kg`, desc: why };
+  },
+  // Texas Method intensity day: 1 × 5 at a new best, +2,5 kg after every success.
+  txI(data, active, idx) {
+    const t = texasWeight(data, active, idx);
+    return { rows: [{ kg: t.kg, reps: 5, working: true, label: 'nov rekord', confirm: true }], title: `1 × 5 @ ${fmtKg(t.kg)} kg`, desc: `${t.why} Vpiši, koliko ponovitev je šlo.` };
+  },
+  // Texas Method volume day: 5 × 5 at 90 % of this week's intensity weight.
+  txV(data, active, idx) {
+    const t = texasWeight(data, active, idx);
+    const kg = r25(t.kg * 0.9);
+    return { rows: Array.from({ length: 5 }, () => ({ kg, reps: 5, working: true })), title: `5 × 5 @ ${fmtKg(kg)} kg`, desc: `90 % teže dneva intenzivnosti (${fmtKg(t.kg)} kg).` };
+  }
+};
+
+function texasWeight(data, active, idx) {
+  let kg = f25(fiveRm(active.basis) * 0.98), why = 'Začetek: malo pod tvojim 5RM.';
+  for (const d of prevSame(data, active, idx, 'I')) {
+    const best = Math.max(0, ...repsAtLeast(d.ex, kg).map(x => x.reps));
+    if (best >= 5) { why = `Zadnjič ${fmtKg(kg)} × 5 uspešno — +2,5 kg.`; kg += 2.5; }
+    else why = `Zadnjič ${fmtKg(kg)} kg × ${best} — ista teža še enkrat.`;
+  }
+  return { kg, why };
+}
+
 // Rows for session idx of the active program: warm-ups, then working sets.
 export function sessionPlan(data, active, idx) {
   const prog = programByKey(active.key);
@@ -182,6 +316,10 @@ export function sessionPlan(data, active, idx) {
     return { sess, rows, title: `Test: ${fmtKg(kg)} kg × čim več ponovitev`,
       desc: `Ena serija do tehnične odpovedi (brez pomoči). ${sess.key === 'T0' ? 'Ista teža bo na koncu programa' : `Na začetku programa: ${first && first.before != null ? first.before + ' pon.' : '—'}`} — tako se vidi napredek.` };
   }
+  if (sess.rule) {
+    const t = RULES[sess.rule](data, active, idx, sess);
+    return { sess, rows: [...warmups(t.rows[0].kg), ...t.rows], title: t.title, desc: t.desc };
+  }
   if (sess.dp) {
     const t = dpTargets(data, active, idx, sess);
     const rows = [...warmups(t.kg), ...t.reps.map(r => ({ kg: t.kg, reps: r, working: true }))];
@@ -191,13 +329,20 @@ export function sessionPlan(data, active, idx) {
   const work = [];
   for (const b of sess.blocks) {
     const kg = r25(basis * b.pct / 100 + (b.add || 0));
-    for (let i = 0; i < b.sets; i++) work.push({ kg, reps: b.reps, working: true, label: b.amrap ? `${b.reps}+ (do odpovedi)` : '', amrap: !!b.amrap, confirm: !!b.amrap });
+    for (let i = 0; i < b.sets; i++) {
+      work.push(b.warm
+        ? { kg, reps: b.reps, working: false, label: 'ogrevanje' }
+        : { kg, reps: b.reps, working: true, label: b.amrap ? `${b.reps}+ (do odpovedi)` : '', amrap: !!b.amrap, confirm: !!b.amrap });
+    }
   }
-  const groups = sess.blocks.map(b => {
+  const groups = sess.blocks.filter(b => !b.warm).map(b => {
     const kg = fmtKg(r25(basis * b.pct / 100 + (b.add || 0)));
     return b.sets > 1 ? `${b.sets} × ${b.reps} @ ${kg} kg` : `${kg} × ${b.reps}${b.amrap ? '+' : ''}`;
   });
-  return { sess, rows: [...warmups(work[0].kg), ...work], title: groups.join(', '),
+  // Programs that write their own warm-up sets (Sheiko) only get the empty bar first.
+  const own = sess.blocks.some(b => b.warm);
+  const pre = own ? (work[0].kg >= 45 ? [{ kg: 20, reps: 10, working: false, label: 'ogrevanje' }] : []) : warmups(work[0].kg);
+  return { sess, rows: [...pre, ...work], title: groups.join(', '),
     desc: sess.blocks.some(b => b.amrap) ? 'Zadnja serija (+) do tehnične odpovedi — vpiši, koliko si jih naredil.' : '' };
 }
 
@@ -240,7 +385,7 @@ export function experimentRec(data, now = new Date()) {
   const plan = sessionPlan(data, n.active, n.idx);
   const working = plan.rows.filter(r => r.working);
   return {
-    type: 'program', program: true, title: `${n.sess.name}: ${plan.title}`, reason: plan.desc || `Trening ${n.idx + 1} od ${n.total}.`,
+    type: 'program', program: true, title: n.sess.test ? plan.title : `${n.sess.name}: ${plan.title}`, reason: plan.desc || `Trening ${n.idx + 1} od ${n.total}.`,
     last: head, note: n.warn, plan: plan.rows, kg: working.length ? working[0].kg : 0, reps: working.map(r => r.reps), idx: n.idx
   };
 }
