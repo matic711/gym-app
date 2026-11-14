@@ -85,7 +85,7 @@ function paused() {
 
 // Sheiko-style bench: lots of sets of 2–5 reps at 70–85 %, pyramids, rarely
 // above 90 %. The 50–60 % sets are part of the program (its own warm-up).
-function sheiko() {
+function sheiko(n = 8) {
   const W = (p, r, sets = 1) => B(sets, r, p, { warm: p <= 60 });
   const weeks = [
     [[W(50, 5), W(60, 4), W(70, 3, 2), W(75, 3, 5)], [W(50, 6), W(60, 6), W(70, 6, 4)]],
@@ -97,8 +97,10 @@ function sheiko() {
     [[W(50, 3), W(60, 3), W(70, 3), W(80, 2, 2), W(85, 2, 3)], [W(50, 5), W(60, 4), W(70, 3, 3)]],
     [[W(50, 3), W(60, 3), W(70, 3, 2), W(75, 2, 3)], null]
   ];
+  // 6-week version: three weeks of each phase (without the light 4th and the 7th week).
+  const pick = n <= 6 ? [0, 1, 2, 4, 5, 7] : [0, 1, 2, 3, 4, 5, 6, 7];
   const s = [];
-  weeks.forEach(([a, b], w) => {
+  pick.map(i => [weeks[i], i]).forEach(([[a, b], w]) => {
     const phase = w < 4 ? 'Pripravljalna faza' : 'Tekmovalna faza';
     s.push({ key: 'A', name: `${phase} · težji dan`, blocks: a });
     s.push(b ? { key: 'B', name: `${phase} · volumen`, blocks: b } : { key: 'T', name: 'Test 1RM', test: '1rm' });
@@ -107,21 +109,21 @@ function sheiko() {
 }
 
 // GZCLP: T1 bench 5 × 3+ and T2 bench 3 × 10, progression from the results.
-function gzclp() {
+function gzclp(n = 8) {
   const s = [];
-  for (let w = 0; w < 8; w++) {
+  for (let w = 0; w < n; w++) {
     s.push({ key: 'A', name: 'T1 (težko)', rule: 'gzT1' });
-    s.push(w === 7 ? { key: 'T', name: 'Test 1RM', test: '1rm' } : { key: 'B', name: 'T2 (volumen)', rule: 'gzT2' });
+    s.push(w === n - 1 ? { key: 'T', name: 'Test 1RM', test: '1rm' } : { key: 'B', name: 'T2 (volumen)', rule: 'gzT2' });
   }
   return s;
 }
 
 // Texas Method, two days: volume 5 × 5 at 90 %, intensity 1 × 5 at a new best.
-function texas() {
+function texas(n = 8) {
   const s = [];
-  for (let w = 0; w < 8; w++) {
+  for (let w = 0; w < n; w++) {
     s.push({ key: 'V', name: 'Dan volumna', rule: 'txV' });
-    s.push(w === 7 ? { key: 'T', name: 'Test 1RM', test: '1rm' } : { key: 'I', name: 'Dan intenzivnosti', rule: 'txI' });
+    s.push(w === n - 1 ? { key: 'T', name: 'Test 1RM', test: '1rm' } : { key: 'I', name: 'Dan intenzivnosti', rule: 'txI' });
   }
   return s;
 }
@@ -150,6 +152,12 @@ export const PROGRAMS = [
 ];
 
 export function programByKey(key) { return PROGRAMS.find(p => p.key === key) || null; }
+
+// Sessions of a running or finished program (some have a shorter version, e.g. 6 weeks).
+export function sessionsFor(entry) {
+  const prog = programByKey(entry.key);
+  return prog ? prog.build(entry.weeks || prog.weeks) : [];
+}
 
 // Reps test weight: 85 % of the 1RM the program started with.
 export function repsTestKg(basis) { return r25(basis * 0.85); }
@@ -199,8 +207,7 @@ function workingSetsOf(ex) {
 
 // Weight and reps for a double-progression session, from the last one of the same kind.
 function dpTargets(data, active, idx, sess) {
-  const prog = programByKey(active.key);
-  const all = prog.build();
+  const all = sessionsFor(active);
   const prev = doneSessions(data, active.id).filter(d => d.idx < idx && all[d.idx] && all[d.idx].key === sess.key).pop();
   const { sets, min, max } = sess.dp;
   if (!prev) return { kg: f25(active.basis * sess.dp.startPct / 100), reps: Array(sets).fill(min), why: 'Prvi trening te vrste.' };
@@ -214,7 +221,7 @@ function dpTargets(data, active, idx, sess) {
 
 // Earlier sessions of the same kind in this program, oldest first.
 function prevSame(data, active, idx, key) {
-  const all = programByKey(active.key).build();
+  const all = sessionsFor(active);
   return doneSessions(data, active.id).filter(d => d.idx < idx && all[d.idx] && all[d.idx].key === key);
 }
 
@@ -233,7 +240,9 @@ const RULES = {
   // start again at 85 %. Many reps on the last set → bigger jump.
   gzT1(data, active, idx) {
     const SCH = [[5, 3], [6, 2], [10, 1]];
-    let kg = f25(fiveRm(active.basis) * 0.85), st = 0, why = 'Začetek: približno 85 % tvojega 5RM.';
+    // A short block starts a bit heavier so the last weeks still reach real work.
+    const startPct = (active.weeks || 8) <= 6 ? 0.9 : 0.85;
+    let kg = f25(fiveRm(active.basis) * startPct), st = 0, why = `Začetek: približno ${Math.round(startPct * 100)} % tvojega 5RM.`;
     for (const d of prevSame(data, active, idx, 'A')) {
       const [n, r] = SCH[st];
       const sets = repsAtLeast(d.ex, kg);
@@ -284,7 +293,7 @@ const RULES = {
 };
 
 function texasWeight(data, active, idx) {
-  let kg = f25(fiveRm(active.basis) * 0.98), why = 'Začetek: malo pod tvojim 5RM.';
+  let kg = f25(fiveRm(active.basis) * 0.95), why = 'Začetek: malo pod tvojim 5RM.';
   for (const d of prevSame(data, active, idx, 'I')) {
     const best = Math.max(0, ...repsAtLeast(d.ex, kg).map(x => x.reps));
     if (best >= 5) { why = `Zadnjič ${fmtKg(kg)} × 5 uspešno — +2,5 kg.`; kg += 2.5; }
@@ -296,7 +305,7 @@ function texasWeight(data, active, idx) {
 // Rows for session idx of the active program: warm-ups, then working sets.
 export function sessionPlan(data, active, idx) {
   const prog = programByKey(active.key);
-  const sess = prog.build()[idx];
+  const sess = sessionsFor(active)[idx];
   if (!sess) return null;
   const basis = active.basis;
   if (sess.test === '1rm') {
@@ -353,7 +362,7 @@ export function nextSession(data, now = new Date()) {
   if (!active) return null;
   const prog = programByKey(active.key);
   if (!prog) return null;
-  const all = prog.build();
+  const all = sessionsFor(active);
   const done = doneSessions(data, active.id);
   const idx = done.length ? done[done.length - 1].idx + 1 : 0;
   if (idx >= all.length) return null;
@@ -398,7 +407,7 @@ function setsOf(ex) { return (ex.sets || []).map(s => ({ kg: Number(s.kg) || 0, 
 export function computeResult(data, entry) {
   const prog = programByKey(entry.key);
   if (!prog) return null;
-  const all = prog.build();
+  const all = sessionsFor(entry);
   const done = doneSessions(data, entry.id);
   if (prog.test === '1rm') {
     const t = done.find(d => all[d.idx] && all[d.idx].test === '1rm');
@@ -427,10 +436,74 @@ export function resultText(r) {
 
 // ---- actions ----------------------------------------------------------------
 
-export function startProgram(data, key, oneRm, now = new Date()) {
+export function startProgram(data, key, oneRm, now = new Date(), opts = {}) {
   const ex = experimentOf(data);
   if (oneRm > 0) ex.oneRm = oneRm;
   ex.active = { id: 'p' + Date.now().toString(36), key, startISO: isoDate(now), basis: ex.oneRm };
+  if (opts.weeks) ex.active.weeks = opts.weeks;
+  if (opts.planIdx != null) ex.active.planIdx = opts.planIdx;
+}
+
+// ---- plan until a date ---------------------------------------------------------
+
+// Three 6-week programs back to back (each ends with a 1RM test), with an easy
+// week after the first. Forecasts are kg on top of the 1RM a program starts
+// with: [low, expected, high]. An intermediate bench (~110 kg) typically adds
+// 1–2 kg a month; a new program and test practice add a little at first.
+export const PLAN_PROGRAMS = [
+  { key: 'sheiko', weeks: 6, forecast: [0, 2.5, 5], why: 'Najprej volumen in tehnika pri 70–85 % — dobra osnova, malo utrujenosti pred prazniki.' },
+  { key: 'gzclp', weeks: 6, forecast: [0, 2.5, 5], why: 'Težke trojke z zadnjo serijo do odpovedi + 3 × 10; teže sledijo tvojim rezultatom.' },
+  { key: 'texas', weeks: 6, forecast: [0, 2.5, 5], why: 'Na koncu vsak teden nov 5RM — najbolj neposredno vodi v vrh moči konec marca.' }
+];
+export const PLAN_FINAL = [2.5, 7.5, 12.5];
+
+export function makePlan(data, now = new Date(), endISO = '2027-03-31') {
+  const ex = experimentOf(data);
+  // Start this Monday if it's early in the week, otherwise next Monday.
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dow = (d.getDay() + 6) % 7;
+  let start = addDays(d, dow <= 2 ? -dow : 7 - dow);
+  const items = [];
+  let t = start, breakWeek = null;
+  PLAN_PROGRAMS.forEach((p, i) => {
+    items.push({ ...p, startISO: isoDate(t), endISO: isoDate(addDays(t, p.weeks * 7 - 1)) });
+    t = addDays(t, p.weeks * 7);
+    if (i === 0) { breakWeek = { startISO: isoDate(t), endISO: isoDate(addDays(t, 6)) }; t = addDays(t, 7); }
+  });
+  // No room for the easy week: drop it.
+  if (items[items.length - 1].endISO > endISO && breakWeek) {
+    breakWeek = null;
+    t = start;
+    items.forEach(it => { it.startISO = isoDate(t); it.endISO = isoDate(addDays(t, it.weeks * 7 - 1)); t = addDays(t, it.weeks * 7); });
+  }
+  return { id: 'plan' + Date.now().toString(36), createdISO: isoDate(now), endISO, basis: ex.oneRm, items, breakWeek, final: PLAN_FINAL };
+}
+
+// Plan items with their state: done (with result vs. forecast), running, or waiting.
+export function planStatus(data) {
+  const ex = experimentOf(data);
+  const plan = ex.plan;
+  if (!plan) return null;
+  const items = plan.items.map((it, i) => {
+    const hist = ex.history.find(h => h.planIdx === i && !h.stopped);
+    const running = ex.active && ex.active.planIdx === i ? ex.active : null;
+    const basis = hist ? hist.basis : running ? running.basis : null;
+    const range = basis != null ? it.forecast.map(f => basis + f) : null;
+    let verdict = null;
+    const result = hist ? computeResult(data, hist) : null;
+    if (result && result.kind === '1rm' && range) {
+      verdict = result.kg > range[2] ? 'nad zgornjo mejo' : result.kg > range[1] ? 'nad pričakovanim' : result.kg === range[1] ? 'kot pričakovano' : result.kg >= range[0] ? 'pod pričakovanim, a v razponu' : 'pod spodnjo mejo';
+    }
+    return { ...it, idx: i, prog: programByKey(it.key), state: hist ? 'done' : running ? 'running' : 'waiting', hist, result, range, verdict };
+  });
+  const next = items.find(it => it.state === 'waiting' && !items.some(o => o.state === 'running'));
+  return { plan, items, next: next || null, final: plan.final.map(f => plan.basis + f) };
+}
+
+export function acceptPlan(data, now = new Date()) {
+  const ex = experimentOf(data);
+  if (ex.active) stopProgram(data, now);
+  ex.plan = makePlan(data, now);
 }
 
 export function stopProgram(data, now = new Date()) {
@@ -463,6 +536,8 @@ export function tagWorkout(data, workout, now = new Date()) {
 
 // Program suggested next: the first one not done yet.
 export function suggestedNext(data) {
+  const ps = planStatus(data);
+  if (ps && ps.next) return ps.next.prog;
   const doneKeys = new Set(experimentOf(data).history.filter(h => !h.stopped).map(h => h.key));
   return PROGRAMS.find(p => !doneKeys.has(p.key)) || PROGRAMS[0];
 }
