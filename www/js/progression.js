@@ -134,12 +134,19 @@ export function workingSets(session) {
 function testRepCut(min) { return min >= 5 ? 3 : min >= 4 ? 2 : 0; }
 
 // Working sets for progression: like workingSets, but heavy test sets (e.g. a
-// 100 × 2 for someone who benches 80 × 8) don't count. { top, sets, normal, tests }
-export function progressionSets(session, rule) {
+// 100 × 2 for someone who benches 80 × 8) don't count. A short set is a test
+// only when it's heavier than the rest of the session — and, when last time's
+// working weight (prevTop) is known, not that weight or one step above it,
+// which is a working set that fell short (72,5 × 2 after 70 × 6).
+// { top, sets, normal, tests }
+export function progressionSets(session, rule, prevTop = 0) {
   const cut = testRepCut(rule ? rule.min : 0);
   const all = session.sets.map(s => ({ kg: Number(s.kg) || 0, reps: Number(s.reps) || 0 })).filter(s => s.reps > 0);
-  const normal = all.filter(s => s.reps > cut || s.kg === 0);
-  const tests = all.filter(s => !(s.reps > cut || s.kg === 0));
+  const short = s => s.reps <= cut && s.kg > 0;
+  const restTop = Math.max(0, ...all.filter(s => !short(s)).map(s => s.kg));
+  const isTest = s => short(s) && s.kg > restTop && !(prevTop > 0 && s.kg >= prevTop - 0.01 && s.kg <= prevTop * 1.075);
+  const normal = all.filter(s => !isTest(s));
+  const tests = all.filter(isTest);
   const top = Math.max(0, ...normal.map(s => s.kg));
   return { top, sets: normal.filter(s => s.kg === top), normal, tests };
 }
@@ -175,8 +182,8 @@ export function recommend(data, name, now = new Date()) {
   // that landed under the range (80 × 8 → 95 × 4); doing the new weight a
   // second time makes it the working weight.
   const testDayNote = (session, prevSession) => {
-    const ps = progressionSets(session, rule);
     const prevTop = prevSession ? progressionSets(prevSession, rule).top : 0;
+    const ps = progressionSets(session, rule, prevTop);
     const testTop = ps.tests.reduce((a, x) => Math.max(a, x.kg), 0);
     if (ps.tests.length && (!ps.normal.length || ps.top < testTop * 0.8 || (prevTop > 0 && ps.top < prevTop * 0.95))) {
       const t = ps.tests.reduce((a, x) => (x.kg > a.kg ? x : a));
@@ -198,7 +205,7 @@ export function recommend(data, name, now = new Date()) {
 
   // Nothing but a test day to go on (e.g. only 100 × 3 logged so far): pick a
   // weight that fits the rep range from the heavy sets.
-  if (testDayNote(hist[hist.length - 1], null)) {
+  if (hist.length === 1 && testDayNote(hist[0], null)) {
     const ps = progressionSets(hist[hist.length - 1], rule);
     const t = ps.tests.reduce((a, x) => (x.kg * (1 + x.reps / 30) > a.kg * (1 + a.reps / 30) ? x : a));
     if (!t.kg) return null;
@@ -223,7 +230,7 @@ export function recommend(data, name, now = new Date()) {
   // deload this function asked for.
   if (hist.length >= 2) {
     const last = hist[hist.length - 1], prev = hist[hist.length - 2];
-    const lt = progressionSets(last, rule).top, pt = progressionSets(prev, rule).top;
+    const pt = progressionSets(prev, rule).top, lt = progressionSets(last, rule, pt).top;
     const gapDays = Math.round((fromIso(last.dateISO) - fromIso(prev.dateISO)) / 86400000);
     if (lt > 0 && pt > 0 && lt < pt * 0.95 && gapDays <= 28) {
       const base = suggestFrom(data, hist.slice(0, -1), rule, now);
@@ -235,7 +242,7 @@ export function recommend(data, name, now = new Date()) {
   }
   const r = suggestFrom(data, hist, rule, now);
   if (r && !testNote) {
-    const t = progressionSets(hist[hist.length - 1], rule).tests;
+    const t = progressionSets(hist[hist.length - 1], rule, hist.length > 1 ? progressionSets(hist[hist.length - 2], rule).top : 0).tests;
     if (t.length) {
       const best = t.reduce((a, s) => (s.kg > a.kg ? s : a));
       return { ...r, note: `Težka serija ${fmt(best.kg)} kg × ${best.reps} ni štela kot delovna serija.` };
@@ -254,7 +261,7 @@ function planFrom(session, top, workKg, targets, rule) {
   const cut = testRepCut(rule.min);
   return session.sets
     .map(s => ({ kg: Number(s.kg) || 0, reps: Number(s.reps) || 0 }))
-    .filter(s => s.reps > 0 && (s.reps > cut || s.kg === 0)) // heavy test sets aren't repeated
+    .filter(s => s.reps > 0 && !(s.reps <= cut && s.kg > top)) // heavy test sets aren't repeated
     .map(s => {
       if (s.kg === top) return { kg: workKg, reps: targets[Math.min(w++, targets.length - 1)], working: true };
       let kg = s.kg;
@@ -280,7 +287,8 @@ function dpPlan(session, top, workKg, targets, rule) {
 
 function suggestFrom(data, hist, rule, now) {
   const session = hist[hist.length - 1];
-  const last = progressionSets(session, rule);
+  const topOf = i => (i >= 0 ? progressionSets(hist[i], rule).top : 0);
+  const last = progressionSets(session, rule, topOf(hist.length - 2));
   if (!last.sets.length) return null;
   const lastReps = last.sets.map(s => s.reps);
   // Double progression works with a fixed number of sets: extra sets don't
@@ -325,7 +333,7 @@ function suggestFrom(data, hist, rule, now) {
   // Two sessions in a row under the range at the same weight, without
   // improving → back off by about 10 % (always at least one step).
   if (below && hist.length >= 2 && last.top > 0) {
-    const prev = progressionSets(hist[hist.length - 2], rule);
+    const prev = progressionSets(hist[hist.length - 2], rule, topOf(hist.length - 3));
     const prevTotal = prev.sets.reduce((a, s) => a + s.reps, 0);
     if (prev.top === last.top && isBelow(prev.sets.map(s => s.reps)) && total <= prevTotal) {
       let kg = floorTo(last.top * 0.9, rule.step);
