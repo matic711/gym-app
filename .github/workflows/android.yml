@@ -82,6 +82,9 @@ jobs:
           cp android-res/raw/gym_alarm.wav android/app/src/main/res/raw/
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/>\n</manifest>#' android/app/src/main/AndroidManifest.xml
           grep -q 'USE_EXACT_ALARM' android/app/src/main/AndroidManifest.xml
+          # Progress photos: lets the WebView's file input open the camera app (Android 11+ package visibility)
+          sed -i 's#</manifest>#    <queries><intent><action android:name="android.media.action.IMAGE_CAPTURE"/></intent></queries>\n</manifest>#' android/app/src/main/AndroidManifest.xml
+          grep -q 'IMAGE_CAPTURE' android/app/src/main/AndroidManifest.xml
           npx cap sync android
 
       - name: Build APK

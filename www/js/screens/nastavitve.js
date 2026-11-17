@@ -5,6 +5,7 @@ import { APP_VERSION, checkForUpdate, openDownload } from '../updates.js';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
+import { photoList, readPhotoB64, restorePhotoFiles, removeAllPhotoFiles } from '../photos.js';
 
 
 function segButtons(options, current, onKey) {
@@ -207,7 +208,7 @@ ${switchRow('Mesečno poročilo', 'Zadnji dan v mesecu ob ' + (s.clock === '24 h
 </div>
 <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
 <span style="font-size: 16px; font-weight: 600">Varnostna kopija</span>
-<span style="font-size: 12px; color: var(--text2)">${s.lastBackupAt ? 'Zadnja: ' + new Date(s.lastBackupAt).toLocaleString('sl-SI') : 'Še ni bila ustvarjena'}</span>
+<span style="font-size: 12px; color: var(--text2)">${s.lastBackupAt ? 'Zadnja: ' + new Date(s.lastBackupAt).toLocaleString('sl-SI') : 'Še ni bila ustvarjena'}${photoList(store.data).length ? ` · vključuje ${photoList(store.data).length} slik` : ''}</span>
 </div>
 </div>
 <button type="button" data-action="backupNow" style="height: 44px; border: 0; border-radius: 12px; background: var(--accent); color: var(--onAccent); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">Ustvari kopijo zdaj</button>
@@ -270,6 +271,40 @@ function downloadViaBrowser(filename, mime, content) {
 // WebView (there is no DownloadManager wired up for it) — the file must be
 // written to disk via the native Filesystem plugin, then handed to the
 // user through the native share sheet (save to Files/Drive, send by mail…).
+// Full backup: the app data plus every progress photo (base64) in one JSON file,
+// so a new phone gets everything back. Written piece by piece, so a backup with
+// many photos never has to cross the native bridge in one go.
+async function exportBackup(onProgress) {
+  const name = 'gym-aplikacija-kopija.json';
+  const data = store.data;
+  const photos = photoList(data);
+  if (!Capacitor.isNativePlatform()) {
+    const files = {};
+    for (const p of photos) { try { files[p.id] = await readPhotoB64(p); } catch (e) { /* missing file */ } }
+    downloadViaBrowser(name, 'application/json', JSON.stringify({ ...data, photoFiles: files }));
+    return true;
+  }
+  try {
+    const json = JSON.stringify(data);
+    await Filesystem.writeFile({ path: name, data: json.slice(0, -1) + ',"photoFiles":{', directory: Directory.Cache, encoding: Encoding.UTF8 });
+    let first = true, i = 0;
+    for (const p of photos) {
+      if (onProgress) onProgress(++i, photos.length);
+      let b64;
+      try { b64 = await readPhotoB64(p); } catch (e) { continue; }
+      await Filesystem.appendFile({ path: name, data: `${first ? '' : ','}${JSON.stringify(p.id)}:"${b64}"`, directory: Directory.Cache, encoding: Encoding.UTF8 });
+      first = false;
+    }
+    await Filesystem.appendFile({ path: name, data: '}}', directory: Directory.Cache, encoding: Encoding.UTF8 });
+    const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache });
+    await Share.share({ title: name, url: uri, dialogTitle: 'Shrani varnostno kopijo (Drive, Datoteke …)' });
+    return true;
+  } catch (err) {
+    alert('Kopija ni uspela: ' + (err && err.message ? err.message : err));
+    return false;
+  }
+}
+
 async function exportFile(filename, mime, content) {
   if (!Capacitor.isNativePlatform()) {
     downloadViaBrowser(filename, mime, content);
@@ -374,9 +409,13 @@ export function mount(root, ctx) {
     root.querySelector('[data-action="exportCsv"]').addEventListener('click', () => exportFile('gym-aplikacija.csv', 'text/csv', toCsv(store.data)));
     root.querySelector('[data-action="exportJson"]').addEventListener('click', () => exportFile('gym-aplikacija.json', 'application/json', JSON.stringify(store.data, null, 2)));
     root.querySelector('[data-action="exportPdf"]').addEventListener('click', () => alert('Izvoz v PDF še ni na voljo v tej različici.'));
-    root.querySelector('[data-action="backupNow"]').addEventListener('click', async () => {
-      await exportFile('gym-aplikacija-kopija.json', 'application/json', JSON.stringify(store.data, null, 2));
-      setSetting({ lastBackupAt: Date.now() });
+    root.querySelector('[data-action="backupNow"]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      const ok = await exportBackup((i, n) => { btn.textContent = `Pripravljam slike ${i}/${n} …`; });
+      btn.disabled = false;
+      btn.textContent = 'Ustvari kopijo zdaj';
+      if (ok) setSetting({ lastBackupAt: Date.now() });
     });
     const fileInput = root.querySelector('#import-file-input');
     root.querySelectorAll('[data-action="restoreBackup"]').forEach(btn => btn.addEventListener('click', () => fileInput.click()));
@@ -384,16 +423,24 @@ export function mount(root, ctx) {
       const file = fileInput.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
+        let parsed;
         try {
-          const parsed = JSON.parse(reader.result);
+          parsed = JSON.parse(reader.result);
           if (!parsed || typeof parsed !== 'object' || !parsed.settings) throw new Error('invalid');
-          store.data = migrate(parsed);
-          store.save();
-          alert('Podatki so bili uspešno uvoženi.');
         } catch (e) {
           alert('Datoteke ni bilo mogoče prebrati. Preveri, ali gre za izvoženo JSON datoteko iz te aplikacije.');
+          return;
         }
+        const files = parsed.photoFiles;
+        delete parsed.photoFiles;
+        let restored = 0;
+        if (files && typeof files === 'object') {
+          try { restored = await restorePhotoFiles(files); } catch (e) { alert('Nekaterih slik ni bilo mogoče obnoviti: ' + (e && e.message ? e.message : e)); }
+        }
+        store.data = migrate(parsed);
+        store.save();
+        alert(`Podatki so bili uspešno uvoženi${restored ? ` (tudi ${restored} slik)` : ''}.`);
       };
       reader.readAsText(file);
       fileInput.value = '';
@@ -421,7 +468,8 @@ export function mount(root, ctx) {
       btn.disabled = false;
     });
     root.querySelector('[data-action="deleteAll"]').addEventListener('click', () => {
-      if (confirm('Izbrišem vse podatke aplikacije (treningi, predloge, počutje, nastavitve)? Tega dejanja ni mogoče razveljaviti.')) {
+      if (confirm('Izbrišem vse podatke aplikacije (treningi, predloge, počutje, slike, nastavitve)? Tega dejanja ni mogoče razveljaviti.')) {
+        removeAllPhotoFiles();
         store.reset();
         ctx.navigate('home');
       }

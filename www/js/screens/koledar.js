@@ -2,6 +2,8 @@ import { store } from '../state.js';
 import { isoDate, addDays, fromIso, startOfWeek, fmtWeekday, fmtDate, fmtNum, fmtNum1, workoutVolume, escapeHtml, plural, MONTHS, DOW_SHORT } from '../util.js';
 import { sessionPerformances, sleepMinutes, pct, hm } from '../analysis.js';
 import { nutritionEnabled, dayTotals, goalsOf, MEALS } from '../nutrition.js';
+import { photosOn, photoList, hydratePhotos, poseLabel } from '../photos.js';
+import { openPhotoAdd, openPhotoViewer } from '../components/photoSheets.js';
 
 const MOOD_LABELS = ['Slabo', 'Meh', 'V redu', 'Dobro', 'Odlično'];
 
@@ -14,12 +16,14 @@ function monthGrid(month, data, selectedIso, todayIso) {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
   const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
   const workoutDays = new Set(data.workouts.map(w => w.dateISO));
+  const photoDays = new Set(photoList(data).map(p => p.dateISO));
   const cells = [];
   for (let d = startOfWeek(first); d <= last || cells.length % 7; d = addDays(d, 1)) {
     const iso = isoDate(d);
     const inMonth = d.getMonth() === month.getMonth();
     const workout = workoutDays.has(iso);
     const logged = !!data.wellness[iso];
+    const photo = photoDays.has(iso);
     const selected = iso === selectedIso, today = iso === todayIso, future = iso > todayIso;
     let numStyle = 'width: 36px; height: 36px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 15px; box-sizing: border-box;';
     if (selected) numStyle += ' background: var(--accent); color: var(--onAccent); font-weight: 700;';
@@ -27,10 +31,10 @@ function monthGrid(month, data, selectedIso, todayIso) {
     else numStyle += ` color: ${inMonth && !future ? 'var(--text)' : 'var(--text2)'}; font-weight: 500;`;
     if (today && !selected) numStyle += ' box-shadow: inset 0 0 0 2px var(--accent);';
     if (!inMonth) numStyle += ' opacity: 0.45;';
-    const label = `${fmtDate(d)}${workout ? ', trening' : ''}${logged ? ', vpisano počutje' : ''}`;
+    const label = `${fmtDate(d)}${workout ? ', trening' : ''}${logged ? ', vpisano počutje' : ''}${photo ? ', slika napredka' : ''}`;
     cells.push(`<button type="button" data-date="${iso}" aria-label="${label}" aria-pressed="${selected}" style="border: 0; background: transparent; padding: 2px 0; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; font: inherit; color: inherit">
 <span style="${numStyle}">${d.getDate()}</span>
-<span style="width: 5px; height: 5px; border-radius: 3px; background: ${logged ? 'var(--mood)' : 'transparent'}"></span>
+<span style="display: flex; gap: 3px"><span style="width: 5px; height: 5px; border-radius: 3px; background: ${logged ? 'var(--mood)' : 'transparent'}"></span>${photo ? '<span style="width: 5px; height: 5px; border-radius: 3px; background: var(--sleep)"></span>' : ''}</span>
 </button>`);
   }
   return cells.join('');
@@ -105,6 +109,30 @@ ${formChip ? `<div>${formChip}</div>` : ''}
 </section>`;
 }
 
+// Progress photos of the selected day.
+function photosHtml(iso, todayIso) {
+  if (iso > todayIso) return '';
+  const list = photosOn(store.data, iso);
+  return `<section style="background: var(--card); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow)">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--sleep)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+Slike napredka
+</h3>
+<div style="display: flex; align-items: center; gap: 12px">
+${photoList(store.data).length ? '<a href="#/slike" style="font-size: 14px; font-weight: 600; color: var(--accentText); text-decoration: none">Vse ›</a>' : ''}
+<button type="button" data-action="addPhoto" style="height: 36px; padding: 0 14px; border: 0; border-radius: 18px; background: ${list.length ? 'var(--accentSoft)' : 'var(--accent)'}; color: ${list.length ? 'var(--accentText)' : 'var(--onAccent)'}; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">+ Dodaj</button>
+</div>
+</div>
+${list.length ? `<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+${list.map(p => `<button type="button" data-photo-open="${p.id}" aria-label="Slika ${poseLabel(p.pose)}" style="border: 0; padding: 0; background: var(--fill); border-radius: 12px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; font: inherit; color: var(--text)">
+<img data-photo="${p.id}" data-thumb="1" alt="" style="width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block; background: var(--fill)">
+<span style="font-size: 12px; font-weight: 600; padding: 4px 0 6px">${poseLabel(p.pose)}</span>
+</button>`).join('')}
+</div>` : '<div style="font-size: 14px; color: var(--text2)">Ta dan ni slik. Slike ostanejo samo v aplikaciji (ne v galeriji telefona) in so del varnostne kopije.</div>'}
+</section>`;
+}
+
 function template(state) {
   const data = store.data;
   const today = new Date();
@@ -146,11 +174,13 @@ ${monthGrid(month, data, selectedIso, todayIso)}
 <div style="display: flex; justify-content: center; gap: 16px; font-size: 12px; color: var(--text2); padding-top: 2px">
 <span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; border-radius: 6px; background: var(--accentSoft); box-shadow: inset 0 0 0 1px var(--accent)"></span>Trening</span>
 <span style="display: flex; align-items: center; gap: 6px"><span style="width: 6px; height: 6px; border-radius: 3px; background: var(--mood)"></span>Vpis počutja</span>
+${photoList(data).length ? '<span style="display: flex; align-items: center; gap: 6px"><span style="width: 6px; height: 6px; border-radius: 3px; background: var(--sleep)"></span>Slika</span>' : ''}
 </div>
 </section>
 
 <h2 id="day-overview" style="margin: 6px 2px 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em">${fmtWeekday(selDate)}, ${fmtDate(selDate)}</h2>
 ${wellnessHtml(data.wellness[selectedIso], selectedIso, todayIso)}
+${photosHtml(selectedIso, todayIso)}
 ${nutritionEnabled(data) && selectedIso <= todayIso ? (() => {
   const t = dayTotals(data, selectedIso), g = goalsOf(data);
   const meals = MEALS.filter(m => t.byMeal[m.key].entries.length).map(m => `${m.label} ${fmtNum(t.byMeal[m.key].kcal)}`).join(' · ');
@@ -204,6 +234,9 @@ export function mount(root, ctx) {
       render();
     });
     root.querySelector('[data-action="today"]')?.addEventListener('click', () => select(isoDate(new Date()), false));
+    root.querySelector('[data-action="addPhoto"]')?.addEventListener('click', () => openPhotoAdd({ dateISO: state.selectedIso }));
+    root.querySelectorAll('[data-photo-open]').forEach(b => b.addEventListener('click', () => openPhotoViewer(b.dataset.photoOpen)));
+    hydratePhotos(root, store.data);
   }
 
   render();

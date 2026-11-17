@@ -32,6 +32,8 @@ export function needsMorningCheckin(data, now = new Date()) {
   const t = data.settings.toggles || {};
   if (t.morningGate === false || !tracksWellness(t)) return false;
   if (now.getHours() < 4) return false; // still "last night"
+  // Nothing logged yet (new phone, or after deleting everything): restoring a backup comes first.
+  if (!Object.keys(data.wellness).length && !data.workouts.length) return false;
   return !morningDone(data, isoDate(now));
 }
 
