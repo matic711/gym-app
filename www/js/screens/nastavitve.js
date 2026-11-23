@@ -242,10 +242,11 @@ ${switchRow('Samodejna kopija', 'Tedensko · v napravo ali oblak', t.autoBackup,
 }
 
 function toCsv(data) {
-  const rows = [['type', 'date', 'name', 'exercise', 'kg', 'reps']];
+  const rows = [['type', 'date', 'name', 'exercise', 'kg', 'reps', 'set_note', 'exercise_note']];
+  const clean = t => String(t || '').replace(/[\r\n]+/g, ' ');
   for (const w of data.workouts) {
     for (const ex of w.exercises) {
-      for (const s of ex.sets) rows.push(['workout', w.dateISO, w.name, ex.name, s.kg, s.reps]);
+      ex.sets.forEach((s, i) => rows.push(['workout', w.dateISO, w.name, ex.name, s.kg, s.reps, clean(s.note), i === 0 ? clean(ex.note) : '']));
     }
   }
   const wellRows = [['type', 'date', 'weight', 'bed', 'wake', 'quality', 'mood', 'energy', 'stress', 'note']];

@@ -9,11 +9,13 @@ function toNum(v) {
 function cloneWorkout(w) {
   return {
     ...w,
-    exercises: w.exercises.map(ex => ({ ...ex, sets: ex.sets.map(s => ({ kg: String(s.kg).replace('.', ','), reps: String(s.reps) })) }))
+    exercises: w.exercises.map(ex => ({ ...ex, sets: ex.sets.map(s => ({ kg: String(s.kg).replace('.', ','), reps: String(s.reps), note: s.note || '' })) }))
   };
 }
 
-function template(d) {
+const noteFieldStyle = 'width: 100%; box-sizing: border-box; border: 0; border-radius: 10px; background: var(--fill); padding: 8px 10px; font: inherit; font-size: 14px; color: var(--text); outline: none; resize: none;';
+
+function template(d, open) {
   const inputStyle = 'height: 36px; box-sizing: border-box; border: 0; border-radius: 10px; background: var(--fill); text-align: center; font: inherit; font-size: 15px; font-weight: 600; color: var(--text); outline: none;';
   const exercisesHtml = d.exercises.map((ex, ei) => `
 <section style="background: var(--card); border-radius: 22px; padding: 16px 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow)">
@@ -26,18 +28,20 @@ function template(d) {
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-9 0 1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path></svg>
 </button>
 </div>
+${ex.note || open.has('e' + ei) ? `<div style="padding: 0 4px"><textarea rows="2" data-note-ex="${ei}" placeholder="Beležka za vajo" style="${noteFieldStyle}">${escapeHtml(ex.note || '')}</textarea></div>` : `<button type="button" data-action="noteEx" data-ei="${ei}" style="align-self: flex-start; border: 0; background: transparent; padding: 0 4px; color: var(--accentText); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">+ Beležka za vajo</button>`}
 <div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 40px; gap: 8px; padding: 0 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text2)">
 <div style="text-align: center">Ser.</div><div style="text-align: center">kg</div><div style="text-align: center">Pon.</div><div></div>
 </div>
 ${ex.sets.map((s, si) => `
 <div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 40px; gap: 8px; align-items: center; padding: 0 4px">
-<div style="text-align: center; font-size: 15px; font-weight: 700">${si + 1}</div>
+<button type="button" data-action="noteSet" data-ei="${ei}" data-si="${si}" aria-label="Serija ${si + 1}, beležka" style="border: 0; background: transparent; padding: 0; height: 36px; font: inherit; font-size: 15px; font-weight: 700; color: var(--text); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1">${si + 1}${s.note ? '<span style="width: 5px; height: 5px; border-radius: 3px; background: var(--accent); margin-top: 3px"></span>' : ''}</button>
 <input type="text" inputmode="decimal" id="kg-${ei}-${si}" aria-label="${escapeHtml(ex.name)}, serija ${si + 1}, teža v kg" data-field="kg" data-ei="${ei}" data-si="${si}" value="${escapeHtml(s.kg)}" style="${inputStyle} width: 100%">
 <input type="text" inputmode="numeric" id="reps-${ei}-${si}" aria-label="${escapeHtml(ex.name)}, serija ${si + 1}, ponovitve" data-field="reps" data-ei="${ei}" data-si="${si}" value="${escapeHtml(s.reps)}" style="${inputStyle} width: 100%">
 <button type="button" data-action="removeSet" data-ei="${ei}" data-si="${si}" aria-label="Odstrani serijo ${si + 1}" style="width: 40px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: var(--text2); display: flex; align-items: center; justify-content: center; cursor: pointer">
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
 </button>
-</div>`).join('')}
+</div>
+${s.note || open.has(`s${ei}:${si}`) ? `<div style="padding: 0 52px 2px 52px"><input type="text" data-note-set="${ei}:${si}" value="${escapeHtml(s.note || '')}" placeholder="Beležka za ${si + 1}. serijo" style="${noteFieldStyle} height: 34px; padding: 0 10px; font-size: 13px"></div>` : ''}`).join('')}
 <button type="button" data-action="addSet" data-ei="${ei}" style="height: 40px; border: 0; border-radius: 12px; background: var(--fill); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; margin: 4px 4px 0">+ Dodaj serijo</button>
 </section>`).join('');
 
@@ -92,6 +96,8 @@ export function mount(root, ctx) {
   if (!original) { ctx.navigate('trening'); return; }
   const draft = cloneWorkout(original);
   let dirty = false;
+  const openNotes = new Set();
+  let focusNote = null;
   root.style.paddingBottom = 'calc(96px + env(safe-area-inset-bottom, 0px) + 20px)';
 
   function leave() {
@@ -99,8 +105,9 @@ export function mount(root, ctx) {
   }
 
   function render() {
-    root.innerHTML = template(draft);
+    root.innerHTML = template(draft, openNotes);
     wire();
+    if (focusNote) { root.querySelector(focusNote)?.focus(); focusNote = null; }
   }
 
   function structural(fn) {
@@ -114,9 +121,10 @@ export function mount(root, ctx) {
     const exercises = draft.exercises.map(ex => ({
       name: ex.name, muscle: ex.muscle || '',
       ...(ex.program ? { program: ex.program } : {}),
+      ...(String(ex.note || '').trim() ? { note: String(ex.note).trim() } : {}),
       sets: ex.sets
         .filter(s => String(s.kg).trim() !== '' && String(s.reps).trim() !== '')
-        .map(s => ({ kg: toNum(s.kg) || 0, reps: toNum(s.reps) || 0, done: true }))
+        .map(s => ({ kg: toNum(s.kg) || 0, reps: toNum(s.reps) || 0, done: true, ...(String(s.note || '').trim() ? { note: String(s.note).trim() } : {}) }))
     })).filter(ex => ex.sets.length);
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.dateISO)) { alert('Vnesi veljaven datum.'); return; }
@@ -142,6 +150,23 @@ export function mount(root, ctx) {
     root.querySelectorAll('input[data-field]').forEach(inp => inp.addEventListener('input', (e) => {
       const ei = Number(inp.dataset.ei), si = Number(inp.dataset.si);
       draft.exercises[ei].sets[si][inp.dataset.field] = e.target.value;
+      dirty = true;
+    }));
+    root.querySelectorAll('[data-action="noteEx"]').forEach(btn => btn.addEventListener('click', () => {
+      openNotes.add('e' + btn.dataset.ei);
+      focusNote = `[data-note-ex="${btn.dataset.ei}"]`;
+      render();
+    }));
+    root.querySelectorAll('[data-action="noteSet"]').forEach(btn => btn.addEventListener('click', () => {
+      const key = `${btn.dataset.ei}:${btn.dataset.si}`;
+      openNotes.add('s' + key);
+      focusNote = `[data-note-set="${key}"]`;
+      render();
+    }));
+    root.querySelectorAll('[data-note-ex]').forEach(el => el.addEventListener('input', () => { draft.exercises[Number(el.dataset.noteEx)].note = el.value; dirty = true; }));
+    root.querySelectorAll('[data-note-set]').forEach(el => el.addEventListener('input', () => {
+      const [ei, si] = el.dataset.noteSet.split(':').map(Number);
+      draft.exercises[ei].sets[si].note = el.value;
       dirty = true;
     }));
     root.querySelectorAll('[data-action="removeSet"]').forEach(btn => btn.addEventListener('click', () => {

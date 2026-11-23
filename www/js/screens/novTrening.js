@@ -1,5 +1,5 @@
 import { store, uid, isoDate } from '../state.js';
-import { fmtNum } from '../util.js';
+import { fmtNum, escapeHtml, fromIso, fmtDateShort } from '../util.js';
 import { openExercisePicker } from '../components/exercisePicker.js';
 import { recommend, lockRanges, setDp, effectiveRule } from '../progression.js';
 import { plateauFor } from '../plateau.js';
@@ -45,6 +45,19 @@ function planRow(rec, si) {
   const work = rec.plan ? rec.plan.filter(r => r.working) : [];
   if (work.length) return { ...work[work.length - 1], label: '' };
   return { kg: rec.kg, reps: rec.reps[rec.reps.length - 1], working: true };
+}
+
+// Last note written for this exercise in an earlier workout: { dateISO, note }.
+function lastNote(data, exerciseName) {
+  const sorted = [...data.workouts].sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+  for (const w of sorted) {
+    const ex = w.exercises.find(e => e.name.toLowerCase() === exerciseName.toLowerCase());
+    if (!ex) continue;
+    const setNotes = ex.sets.map((st, i) => (st.note ? `${i + 1}. serija: ${st.note}` : '')).filter(Boolean);
+    const text = [ex.note, ...setNotes].filter(Boolean).join(' · ');
+    if (text) return { dateISO: w.dateISO, note: text };
+  }
+  return null;
 }
 
 function findPrevSet(data, exerciseName, setIndex) {
@@ -128,7 +141,7 @@ function computeVals(data) {
     }
     const soft = !rec0 || (!rec0.program && !(rec0.rule && rec0.rule.dp));
     const dpOffer = soft ? effectiveRule(data, ex.name) : null;
-    return { ex, ei, rows, rec: rec0, plateau, dpOffer: dpOffer && !dpOffer.off ? dpOffer : null };
+    return { ex, ei, rows, rec: rec0, plateau, dpOffer: dpOffer && !dpOffer.off ? dpOffer : null, prevNote: lastNote(data, ex.name) };
   });
 
   return { exercises, volume: fmtNum(volume), doneCount, setCount };
@@ -163,18 +176,26 @@ ${plateau && !plateau.cut ? `<a href="#/vaja?name=${encodeURIComponent(ex.name)}
 ${dpOffer ? `<button type="button" data-action="enableDp" data-ei="${ei}" style="align-self: flex-start; border: 0; background: transparent; padding: 2px 0; color: var(--accentText); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer">Vklopi double progression (${dpOffer.sets || 3} × ${dpOffer.min}–${dpOffer.max})</button>` : ''}`, applyBtn(ei));
 }
 
-function template(w, vm, restLabel) {
-  const exercisesHtml = vm.exercises.map(({ ex, ei, rows, rec, plateau, dpOffer }) => `
+const noteIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"></path><path d="M9 11h6M9 15h4"></path></svg>';
+const noteFieldStyle = 'width: 100%; box-sizing: border-box; border: 0; border-radius: 10px; background: var(--fill); padding: 8px 10px; font: inherit; font-size: 14px; color: var(--text); outline: none; resize: none;';
+
+function template(w, vm, restLabel, open) {
+  const exercisesHtml = vm.exercises.map(({ ex, ei, rows, rec, plateau, dpOffer, prevNote }) => `
 <section style="background: var(--card); border-radius: 22px; padding: 16px 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow)">
 <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px">
 <div style="display: flex; flex-direction: column; gap: 2px">
 <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: var(--accentText)">${ex.name}</h2>
 <div style="font-size: 12px; color: var(--text2)">${ex.muscle || ''}</div>
 </div>
+<div style="display: flex; align-items: center">
+<button type="button" data-action="noteEx" data-ei="${ei}" aria-label="Beležka za vajo" aria-pressed="${!!ex.note}" style="width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: ${ex.note ? 'var(--accentText)' : 'var(--text2)'}; display: flex; align-items: center; justify-content: center; cursor: pointer">${noteIcon}</button>
 <button type="button" data-action="removeExercise" data-ei="${ei}" aria-label="Odstrani vajo" style="width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: var(--text2); display: flex; align-items: center; justify-content: center; cursor: pointer">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
 </button>
 </div>
+</div>
+${prevNote ? `<div style="margin: 0 4px; font-size: 12px; color: var(--text2); display: flex; gap: 6px"><span style="flex-shrink: 0; font-weight: 600">Beležka ${fmtDateShort(fromIso(prevNote.dateISO))}:</span><span style="overflow-wrap: anywhere">${escapeHtml(prevNote.note)}</span></div>` : ''}
+${ex.note || open.has('e' + ei) ? `<div style="margin: 0 4px"><textarea rows="2" data-note-ex="${ei}" placeholder="Beležka za vajo — občutek, tehnika, bolečina …" style="${noteFieldStyle}">${escapeHtml(ex.note || '')}</textarea></div>` : ''}
 ${rec ? recCardHtml(rec, ei, ex, plateau, dpOffer) : dpOffer ? `<div style="margin: 0 4px"><button type="button" data-action="enableDp" data-ei="${ei}" style="border: 0; background: transparent; padding: 2px 0; color: var(--accentText); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer">Vklopi double progression (${dpOffer.sets || 3} × ${dpOffer.min}–${dpOffer.max})</button></div>` : ''}
 <div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) 64px 56px 44px; gap: 8px; padding: 0 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text2)">
 <div style="text-align: center">Ser.</div>
@@ -190,14 +211,15 @@ ${r.restBefore ? `
 Počitek ${r.restBefore}
 </div>` : ''}
 <div style="${r.rowStyle}">
-<div style="text-align: center; font-size: 15px; font-weight: 700">${r.n}</div>
+<button type="button" data-action="noteSet" data-ei="${ei}" data-si="${r.si}" aria-label="Serija ${r.n}, beležka" style="border: 0; background: transparent; padding: 0; height: 36px; font: inherit; font-size: 15px; font-weight: 700; color: var(--text); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1">${r.n}${r.s.note ? '<span style="width: 5px; height: 5px; border-radius: 3px; background: var(--accent); margin-top: 3px"></span>' : ''}</button>
 <div style="font-size: 14px; color: var(--text2); min-width: 0">${r.prev}${r.label ? `<div style="font-size: 11px; font-weight: 600; color: var(--accentText)">${r.label}</div>` : ''}</div>
 <input type="text" inputmode="decimal" aria-label="Serija ${r.n}, teža v kg" data-field="kg" data-ei="${ei}" data-si="${r.si}" value="${r.s.kg}" placeholder="${r.kgHint}" style="height: 36px; width: 64px; box-sizing: border-box; border: 0; border-radius: 10px; background: var(--fill); text-align: center; font: inherit; font-size: 15px; font-weight: 600; color: var(--text); outline: none">
 <input type="text" inputmode="numeric" aria-label="Serija ${r.n}, ponovitve" data-field="reps" data-ei="${ei}" data-si="${r.si}" value="${r.s.reps}" placeholder="${r.repHint}" style="height: 36px; width: 56px; box-sizing: border-box; border: 0; border-radius: 10px; background: var(--fill); text-align: center; font: inherit; font-size: 15px; font-weight: 600; color: var(--text); outline: none">
 <button type="button" data-action="toggleSet" data-ei="${ei}" data-si="${r.si}" aria-label="Serija ${r.n}${r.s.done ? ' opravljena' : ' označi kot opravljeno'}" aria-pressed="${r.s.done}" style="${r.checkStyle}">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
 </button>
-</div>`).join('')}
+</div>
+${r.s.note || open.has(`s${ei}:${r.si}`) ? `<div style="padding: 0 4px 2px 52px"><input type="text" data-note-set="${ei}:${r.si}" value="${escapeHtml(r.s.note || '')}" placeholder="Beležka za ${r.n}. serijo — npr. RPE 9, pas, pomoč" style="${noteFieldStyle} height: 34px; padding: 0 10px; font-size: 13px"></div>` : ''}`).join('')}
 <button type="button" data-action="addSet" data-ei="${ei}" style="height: 40px; border: 0; border-radius: 12px; background: var(--fill); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; margin: 4px 4px 0">+ Dodaj serijo</button>
 </section>`).join('');
 
@@ -253,6 +275,9 @@ export function mount(root, ctx) {
   if (fitRows(store.data)) store.persist(store.data);
   root.style.paddingBottom = 'calc(96px + env(safe-area-inset-bottom, 0px) + 20px)';
   let timerInterval = null;
+  // Note fields opened by tapping the note icon / set number (shown while empty).
+  const openNotes = new Set();
+  let focusNote = null;
 
   function updateTimerText() {
     const w = store.data.activeWorkout;
@@ -269,9 +294,10 @@ export function mount(root, ctx) {
     if (!w) { ctx.navigate('trening'); return; }
     const vm = computeVals(store.data);
     const restLabel = restSecToLabel(store.data.settings.defaultRestSec || 90);
-    root.innerHTML = template(w, vm, restLabel);
+    root.innerHTML = template(w, vm, restLabel, openNotes);
     updateTimerText();
     wire();
+    if (focusNote) { root.querySelector(focusNote)?.focus(); focusNote = null; }
   }
 
   function mutate(fn) {
@@ -331,6 +357,31 @@ export function mount(root, ctx) {
         });
       });
     });
+    root.querySelectorAll('[data-action="noteEx"]').forEach(btn => btn.addEventListener('click', () => {
+      const ei = btn.dataset.ei;
+      openNotes.add('e' + ei);
+      focusNote = `[data-note-ex="${ei}"]`;
+      render();
+    }));
+    root.querySelectorAll('[data-action="noteSet"]').forEach(btn => btn.addEventListener('click', () => {
+      const key = `${btn.dataset.ei}:${btn.dataset.si}`;
+      openNotes.add('s' + key);
+      focusNote = `[data-note-set="${key}"]`;
+      render();
+    }));
+    // Notes are kept as you type and saved without re-rendering, so a tap on
+    // another button (e.g. "Končaj trening") right after typing isn't lost.
+    const setNote = (target, text) => { if (text) target.note = text; else delete target.note; };
+    root.querySelectorAll('[data-note-ex]').forEach(el => {
+      const ei = Number(el.dataset.noteEx);
+      el.addEventListener('input', () => setNote(store.data.activeWorkout.exercises[ei], el.value.trim()));
+      el.addEventListener('change', () => store.persist(store.data));
+    });
+    root.querySelectorAll('[data-note-set]').forEach(el => {
+      const [ei, si] = el.dataset.noteSet.split(':').map(Number);
+      el.addEventListener('input', () => setNote(store.data.activeWorkout.exercises[ei].sets[si], el.value.trim()));
+      el.addEventListener('change', () => store.persist(store.data));
+    });
     root.querySelectorAll('[data-action="addSet"]').forEach(btn => {
       btn.addEventListener('click', () => {
         const ei = Number(btn.getAttribute('data-ei'));
@@ -385,7 +436,8 @@ export function mount(root, ctx) {
         durationMin,
         exercises: w.exercises.map(ex => ({
           name: ex.name, muscle: ex.muscle || '',
-          sets: ex.sets.filter(s => s.kg !== '' && s.reps !== '').map(s => ({ kg: parseFloat(String(s.kg).replace(',', '.')) || 0, reps: parseFloat(String(s.reps).replace(',', '.')) || 0, done: true }))
+          ...(ex.note ? { note: ex.note } : {}),
+          sets: ex.sets.filter(s => s.kg !== '' && s.reps !== '').map(s => ({ kg: parseFloat(String(s.kg).replace(',', '.')) || 0, reps: parseFloat(String(s.reps).replace(',', '.')) || 0, done: true, ...(s.note ? { note: s.note } : {}) }))
         })).filter(ex => ex.sets.length)
       };
       store.data.workouts.push(saved);

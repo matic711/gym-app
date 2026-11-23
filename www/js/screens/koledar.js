@@ -92,6 +92,7 @@ function workoutHtml(w, perf) {
 <div style="padding: 10px 0; ${i ? 'border-top: 1px solid var(--line);' : ''}">
 <a href="#/vaja?name=${encodeURIComponent(ex.name)}" style="font-size: 15px; font-weight: 600; color: var(--text); text-decoration: none">${escapeHtml(ex.name)}</a>
 <div style="font-size: 13px; color: var(--text2); overflow-wrap: anywhere">${ex.sets.map(s => `${fmtKg(s.kg)}×${s.reps}`).join(' · ')}</div>
+${ex.note || ex.sets.some(s => s.note) ? `<div style="font-size: 13px; color: var(--accentText); overflow-wrap: anywhere">${[ex.note, ...ex.sets.map((s, i) => (s.note ? `${i + 1}. serija: ${s.note}` : ''))].filter(Boolean).map(escapeHtml).join(' · ')}</div>` : ''}
 </div>`).join('');
   return `<section style="background: var(--card); border-radius: 22px; padding: 16px 16px 6px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow)">
 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">

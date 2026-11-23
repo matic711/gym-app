@@ -26,7 +26,7 @@ export function exerciseHistory(data, name) {
       volume += kg * reps;
       totalReps += reps;
     }
-    out.push({ dateISO: w.dateISO, workoutId: w.id, workoutName: w.name, muscle: ex.muscle || '', sets: ex.sets, topKg, topReps, volume, totalReps });
+    out.push({ dateISO: w.dateISO, workoutId: w.id, workoutName: w.name, muscle: ex.muscle || '', note: ex.note || '', sets: ex.sets, topKg, topReps, volume, totalReps });
   }
   return out.sort((a, b) => a.dateISO.localeCompare(b.dateISO));
 }

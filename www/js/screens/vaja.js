@@ -83,6 +83,7 @@ function computeViewModel(name, metricIdx, rangeIdx) {
     date: fmtDate(fromIso(h.dateISO)),
     workoutName: h.workoutName,
     sets: h.sets.map(s => `${fmtKg(Number(s.kg) || 0)}×${s.reps}`).join(' · '),
+    notes: [h.note, ...h.sets.map((s, i) => (s.note ? `${i + 1}. serija: ${s.note}` : ''))].filter(Boolean),
     top: `${fmtKg(h.topKg)} × ${h.topReps}`,
     isPr: pr && h.dateISO === pr.dateISO && h.topKg === pr.kg,
     border: i ? 'border-top: 1px solid var(--line);' : ''
@@ -126,6 +127,7 @@ ${s.isPr ? '<span style="padding: 2px 8px; border-radius: 999px; background: var
 </div>
 <div style="font-size: 13px; color: var(--text2)">${escapeHtml(s.workoutName)}</div>
 <div style="font-size: 13px; color: var(--text); overflow-wrap: anywhere">${s.sets}</div>
+${s.notes.length ? `<div style="font-size: 13px; color: var(--accentText); overflow-wrap: anywhere">${s.notes.map(escapeHtml).join(' · ')}</div>` : ''}
 </div>
 <div style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0">
 <span style="font-size: 11px; color: var(--text2)">Najtežje</span>
