@@ -1,5 +1,7 @@
 import { store } from '../state.js';
-import { isoDate, addDays, startOfWeek, fromIso, DOW_SHORT, fmtDateShort, fmtNum, workoutVolume } from '../util.js';
+import { isoDate, addDays, startOfWeek, fromIso, DOW_SHORT, fmtDateShort, fmtNum, workoutVolume, escapeHtml } from '../util.js';
+import { nextFullSession } from '../programs.js';
+import { nextSession as nextBenchSession } from '../experiment.js';
 
 const DOW_ABBR = ['pon', 'tor', 'sre', 'čet', 'pet', 'sob', 'ned'];
 
@@ -100,6 +102,20 @@ Prazen trening
 Iz predloge
 </a>
 </div>
+
+${(() => {
+    const n = nextFullSession(store.data);
+    const b = n ? null : nextBenchSession(store.data);
+    const head = n ? `Program · ${escapeHtml(n.prog.name)} · teden ${n.week}/${n.weeks}` : b ? `Bench eksperiment · ${escapeHtml(b.prog.name)}` : 'Programi';
+    const sub = n ? (n.blocked ? n.blocked : `Naslednji: ${escapeHtml(n.sess.name)}`) : b ? 'Bench sledi programu, ostale vaje po svoje' : 'Celotni programi, specializacije in primerjava, kaj ti najbolj prinese';
+    return `<a href="#/programi" style="background: var(--card); border-radius: 20px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); box-shadow: var(--shadow)">
+<div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accentText)">${head}</div>
+<div style="font-size: 14px; color: var(--text2)">${sub}</div>
+</div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--text2); flex-shrink: 0"><path d="M9 6l6 6-6 6"></path></svg>
+</a>`;
+  })()}
 
 <h2 style="margin: 6px 2px 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em">Zgodovina</h2>
 <section style="background: var(--card); border-radius: 22px; overflow: hidden; box-shadow: var(--shadow)">

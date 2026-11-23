@@ -4,6 +4,7 @@ import { openExercisePicker } from '../components/exercisePicker.js';
 import { recommend, lockRanges, setDp, effectiveRule } from '../progression.js';
 import { plateauFor } from '../plateau.js';
 import { isBench, experimentRec, experimentOf, tagWorkout } from '../experiment.js';
+import { programRec, tagFullWorkout } from '../programs.js';
 
 const REC_COLORS = { up: 'var(--good)', reps: 'var(--accentText)', hold: 'var(--mood)', deload: 'var(--danger)', calib: 'var(--accentText)', program: 'var(--accentText)' };
 const REC_ICONS = { up: '↑', reps: '+1', hold: '=', deload: '↓', calib: '≈', program: '' };
@@ -11,7 +12,9 @@ const REC_ICONS = { up: '↑', reps: '+1', hold: '=', deload: '↓', calib: '≈
 // The suggestion for an exercise: the bench experiment's session while a
 // program runs, otherwise double progression / the automatic suggestion.
 function recFor(data, name) {
-  if (isBench(name) && experimentOf(data).active) return experimentRec(data);
+  const pr = programRec(data, data.activeWorkout, name);
+  if (pr) return pr;
+  if (isBench(name) && experimentOf(data).active && !(data.activeWorkout && data.activeWorkout.programSession)) return experimentRec(data);
   return recommend(data, name);
 }
 
@@ -34,7 +37,7 @@ function fitRows(data) {
   return changed;
 }
 
-function fmtKgInput(kg) { return String(Math.round(kg * 100) / 100).replace('.', ','); }
+function fmtKgInput(kg) { return kg == null || Number.isNaN(Number(kg)) ? '' : String(Math.round(kg * 100) / 100).replace('.', ','); }
 
 // Suggested weight/reps for set row si: the planned row, or another working set past the plan.
 function planRow(rec, si) {
@@ -138,7 +141,7 @@ function recCardHtml(rec, ei, ex, plateau, dpOffer) {
 <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0">${inner}</div>${side}</div>`;
   const small = (t, color = 'var(--text2)') => `<div style="font-size: 12px; color: ${color}">${t}</div>`;
   if (rec.program) {
-    return box(`<a href="#/eksperiment" style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accentText); text-decoration: none">Bench eksperiment · ${rec.last} ›</a>
+    return box(`<a href="${rec.link || '#/eksperiment'}" style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accentText); text-decoration: none">${rec.head ? rec.head : `Bench eksperiment · ${rec.last}`} ›</a>
 <div style="font-size: 15px; font-weight: 700">${rec.title}</div>
 ${small(rec.reason)}${rec.note ? small(rec.note, 'var(--mood)') : ''}`, rec.blocked ? '' : applyBtn(ei));
   }
@@ -386,7 +389,8 @@ export function mount(root, ctx) {
         })).filter(ex => ex.sets.length)
       };
       store.data.workouts.push(saved);
-      tagWorkout(store.data, saved);
+      if (w.programSession) tagFullWorkout(store.data, saved, w.programSession);
+      else tagWorkout(store.data, saved);
       store.data.activeWorkout = null;
       lockRanges(store.data);
       store.save();

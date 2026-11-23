@@ -79,7 +79,7 @@ function daysBetween(a, b) { return Math.round((fromIso(b) - fromIso(a)) / 86400
 
 // Full-screen viewer: previous/next photo of the same pose, compare with the
 // first one of that pose, change pose, delete.
-export function openPhotoViewer(id, { compare = false } = {}) {
+export function openPhotoViewer(id, { compare = false, baseId = null } = {}) {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position: fixed; inset: 0; background: #000; z-index: 210; display: flex; flex-direction: column; color: #fff;';
   document.body.appendChild(overlay);
@@ -94,7 +94,8 @@ export function openPhotoViewer(id, { compare = false } = {}) {
     if (!p) { close(); return; }
     const same = sortedPhotos(store.data, p.pose);
     const i = same.findIndex(x => x.id === p.id);
-    const first = same[0];
+    // Compare with a chosen photo (e.g. the start of a program), else the first of this pose.
+    const first = (baseId && photoList(store.data).find(x => x.id === baseId)) || same[0];
     const canCompare = first && first.id !== p.id;
     const label = (x) => `<div style="font-size: 13px; font-weight: 600">${fmtDate(fromIso(x.dateISO))}${weightOn(x.dateISO) ? ` · ${weightOn(x.dateISO)}` : ''}</div>`;
     const img = (x) => `<img data-full="${x.id}" alt="${poseLabel(x.pose)}, ${fmtDate(fromIso(x.dateISO))}" style="width: 100%; height: 100%; object-fit: contain; display: block">`;
@@ -118,7 +119,7 @@ ${cmp && canCompare ? `<div style="text-align: center; font-size: 13px; opacity:
 <div style="padding: 10px 12px calc(env(safe-area-inset-bottom, 0px) + 14px); display: flex; flex-direction: column; gap: 10px">
 <div style="display: flex; justify-content: space-between; gap: 8px">
 <button type="button" data-v="prev" ${i <= 0 ? 'disabled' : ''} style="${btnStyle} ${i <= 0 ? 'opacity: 0.35;' : ''}">‹ Prejšnja</button>
-${canCompare ? `<button type="button" data-v="compare" style="${btnStyle} ${cmp ? 'background: #fff; color: #000;' : ''}">${cmp ? 'Samo ta' : 'Primerjaj s prvo'}</button>` : ''}
+${canCompare ? `<button type="button" data-v="compare" style="${btnStyle} ${cmp ? 'background: #fff; color: #000;' : ''}">${cmp ? 'Samo ta' : baseId ? 'Primerjaj z začetkom' : 'Primerjaj s prvo'}</button>` : ''}
 <button type="button" data-v="next" ${i >= same.length - 1 ? 'disabled' : ''} style="${btnStyle} ${i >= same.length - 1 ? 'opacity: 0.35;' : ''}">Naslednja ›</button>
 </div>
 <div style="display: flex; justify-content: space-between; gap: 8px">

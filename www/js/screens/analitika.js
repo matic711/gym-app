@@ -8,6 +8,7 @@ import { recordsIn } from '../reports.js';
 import { lineChartHtml } from '../components/lineChart.js';
 import { experimentOf, nextSession } from '../experiment.js';
 import { photoList } from '../photos.js';
+import { nextFullSession, programsOf } from '../programs.js';
 
 const RANGES = [
   { key: 'week', label: 'Teden' },
@@ -340,7 +341,10 @@ ${(() => {
     const ex = experimentOf(store.data);
     const sub = n ? `${n.prog.name} · trening ${n.idx + 1}/${n.total}` : ex.history.length ? `${ex.history.length} ${ex.history.length === 1 ? 'program' : 'programi'} · izberi naslednjega` : 'Programi 2× na teden, primerjava napredka';
     const n2 = photoList(store.data).length;
-    return `<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">${navTile('#/eksperiment', 'Bench eksperiment', sub, 'var(--accentText)')}${navTile('#/slike', 'Slike napredka', n2 ? plural(n2, ['slika', 'sliki', 'slike', 'slik']) : 'Dodaj prvo sliko', 'var(--text2)')}</div>`;
+    const fp = nextFullSession(store.data);
+    const fDone = programsOf(store.data).history.filter(h => !h.stopped).length;
+    return `<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">${navTile('#/eksperiment', 'Bench eksperiment', sub, 'var(--accentText)')}${navTile('#/slike', 'Slike napredka', n2 ? plural(n2, ['slika', 'sliki', 'slike', 'slik']) : 'Dodaj prvo sliko', 'var(--text2)')}</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px">${navTile('#/programi', 'Programi in rezultati', fp ? `${fp.prog.name} · teden ${fp.week}/${fp.weeks}` : fDone ? `${fDone} končanih · primerjava` : 'Celotni programi, specializacije', 'var(--accentText)')}</div>`;
   })()}
 
 ${strengthCard}

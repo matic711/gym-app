@@ -1,6 +1,7 @@
 import { store, uid } from '../state.js';
 import { fromIso, fmtDate, fmtDateShort, escapeHtml } from '../util.js';
 import { lineChartHtml } from '../components/lineChart.js';
+import { programsOf, stopFullProgram } from '../programs.js';
 import {
   PROGRAMS, PER_WEEK, BENCH, programByKey, experimentOf, nextSession, sessionPlan, doneSessions,
   computeResult, resultText, startProgram, stopProgram, suggestedNext, fmtKg, repsTestKg,
@@ -230,6 +231,14 @@ ${resultsHtml(data)}
 </main>`;
 }
 
+// Only one program runs at a time: a bench program replaces a full one.
+function okToStopFull() {
+  if (!programsOf(store.data).active) return true;
+  if (!confirm('Teče celoten program (Programi). Ga prekinem in začnem bench program?')) return false;
+  stopFullProgram(store.data);
+  return true;
+}
+
 export function mount(root, ctx) {
   let showAll = false, showOthers = false;
   function render() {
@@ -253,6 +262,7 @@ export function mount(root, ctx) {
     root.querySelectorAll('[data-action="start"]').forEach(b => b.addEventListener('click', () => {
       const ex = experimentOf(store.data);
       const p = programByKey(b.dataset.key);
+      if (!okToStopFull()) return;
       const val = prompt(`${p.name}: teže bodo izračunane iz 1RM. Potrdi ali popravi 1RM (kg):`, fmtKg(ex.oneRm));
       if (val === null) return;
       const num = parseFloat(String(val).replace(',', '.'));
@@ -264,6 +274,7 @@ export function mount(root, ctx) {
     root.querySelector('[data-action="acceptPlan"]')?.addEventListener('click', () => {
       const ex = experimentOf(store.data);
       if (ex.active && !confirm('Trenutni program se prekine (opravljeni treningi ostanejo). Sprejmem načrt?')) return;
+      if (!okToStopFull()) return;
       acceptPlan(store.data);
       store.save();
     });
@@ -276,6 +287,7 @@ export function mount(root, ctx) {
       const ex = experimentOf(store.data);
       const ps = planStatus(store.data);
       if (!ps || !ps.next) return;
+      if (!okToStopFull()) return;
       const val = prompt(`${ps.next.prog.name}: teže bodo izračunane iz 1RM. Potrdi ali popravi 1RM (kg):`, fmtKg(ex.oneRm));
       if (val === null) return;
       const num = parseFloat(String(val).replace(',', '.'));

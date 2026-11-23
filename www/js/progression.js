@@ -168,8 +168,10 @@ function poorReadiness(data, now) {
 
 // Suggestion for today, or null when there is nothing to base it on.
 // { type: 'up' | 'reps' | 'hold' | 'deload' | 'first', kg, reps: [per working set], sets, title, reason, rule }
-export function recommend(data, name, now = new Date()) {
-  const base0 = ruleFor(data, name);
+// `override` lets a program prescribe its own double progression for an
+// exercise (e.g. { sets: 3, min: 8, max: 12 }) without touching the user's setting.
+export function recommend(data, name, now = new Date(), override = null) {
+  const base0 = override ? { ...ruleFor(data, name), ...override, off: false, dp: true, rangeLocked: true } : ruleFor(data, name);
   if (base0.off) return null;
   const todayIso = isoDate(now);
   let hist = exerciseHistory(data, name).filter(h => h.dateISO <= todayIso);

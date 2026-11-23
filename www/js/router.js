@@ -16,6 +16,7 @@ import * as porocilo from './screens/porocilo.js';
 import * as prehrana from './screens/prehrana.js';
 import * as eksperiment from './screens/eksperiment.js';
 import * as slike from './screens/slike.js';
+import * as programi from './screens/programi.js';
 
 const SCREENS = {
   home: { mod: domov, tab: 'home' },
@@ -32,7 +33,8 @@ const SCREENS = {
   vaja: { mod: vaja, tab: 'analitika' },
   forma: { mod: forma, tab: 'analitika' },
   eksperiment: { mod: eksperiment, tab: 'analitika' },
-  slike: { mod: slike, tab: 'analitika' }
+  slike: { mod: slike, tab: 'analitika' },
+  programi: { mod: programi, tab: 'trening' }
 };
 
 let currentUnmount = null;
